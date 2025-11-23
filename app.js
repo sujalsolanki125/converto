@@ -3,16 +3,21 @@
  * Handles UI interactions and coordinates all modules
  */
 
-// Initialize modules
-const contentGen = new ContentGenerator();
-const markdownConv = new MarkdownConverter();
-const exportHandler = new ExportHandler();
+// Declare module variables
+let contentGen;
+let markdownConv;
+let exportHandler;
 
 /**
  * Initialize the application
  */
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Converto initialized');
+    
+    // Initialize modules after DOM is ready
+    contentGen = new ContentGenerator();
+    markdownConv = new MarkdownConverter();
+    exportHandler = new ExportHandler();
     
     // Set up auto-preview on input
     const input = document.getElementById('markdownInput');
