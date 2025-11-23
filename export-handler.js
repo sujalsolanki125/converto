@@ -250,26 +250,29 @@ class ExportHandler {
         Array.from(node.childNodes).forEach(child => {
             if (child.nodeType === Node.TEXT_NODE) {
                 const text = child.textContent;
-                if (text) {
+                if (text && text.trim()) {  // Only add if there's actual content
                     result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 }
             } else if (child.nodeType === Node.ELEMENT_NODE) {
                 const tagName = child.tagName.toLowerCase();
                 const text = child.textContent;
-                if (tagName === 'strong' || tagName === 'b') {
-                    result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                } else if (tagName === 'em' || tagName === 'i') {
-                    result += `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                } else if (tagName === 'code') {
-                    result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                } else if (tagName === 'a') {
-                    result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                } else {
-                    result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                if (text && text.trim()) {  // Only process if there's content
+                    if (tagName === 'strong' || tagName === 'b') {
+                        result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    } else if (tagName === 'em' || tagName === 'i') {
+                        result += `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    } else if (tagName === 'code') {
+                        result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    } else if (tagName === 'a') {
+                        result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    } else {
+                        result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    }
                 }
             }
         });
-        return result;
+        // If no content was added, return a single empty run to ensure valid XML
+        return result || '<w:r><w:t></w:t></w:r>';
     }
 
     /**
