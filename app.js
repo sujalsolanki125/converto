@@ -194,6 +194,11 @@ function insertAtCursor(text) {
  * Export to HTML
  */
 async function exportToHTML() {
+    if (!exportHandler) {
+        alert('Application is still loading. Please wait a moment.');
+        return;
+    }
+    
     const markdown = document.getElementById('markdownInput').value;
     
     if (!markdown.trim()) {
@@ -238,6 +243,11 @@ async function exportToHTML() {
  * Export to DOCX
  */
 async function exportToDOCX() {
+    if (!exportHandler) {
+        alert('Application is still loading. Please wait a moment.');
+        return;
+    }
+    
     const markdown = document.getElementById('markdownInput').value;
     
     if (!markdown.trim()) {
@@ -282,6 +292,11 @@ async function exportToDOCX() {
  * Export to PDF
  */
 async function exportToPDF() {
+    if (!exportHandler) {
+        alert('Application is still loading. Please wait a moment.');
+        return;
+    }
+    
     const markdown = document.getElementById('markdownInput').value;
     
     if (!markdown.trim()) {
@@ -338,6 +353,11 @@ async function exportToPDF() {
  * Copy formatted content to clipboard
  */
 async function copyFormattedContent() {
+    if (!exportHandler) {
+        alert('Application is still loading. Please wait a moment.');
+        return;
+    }
+    
     const markdown = document.getElementById('markdownInput').value;
     
     if (!markdown.trim()) {
