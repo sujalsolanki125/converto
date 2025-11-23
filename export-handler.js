@@ -178,35 +178,47 @@ class ExportHandler {
                 const tagName = node.tagName.toLowerCase();
                 
                 switch (tagName) {
-                    case 'h1':
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${this.processChildren(node)}</w:p>`;
-                    case 'h2':
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${this.processChildren(node)}</w:p>`;
-                    case 'h3':
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${this.processChildren(node)}</w:p>`;
-                    case 'h4':
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading4"/></w:pPr>${this.processChildren(node)}</w:p>`;
-                    case 'p':
-                        return `<w:p>${this.processChildren(node)}</w:p>`;
+                    case 'h1': {
+                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${content}</w:p>`;
+                    }
+                    case 'h2': {
+                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${content}</w:p>`;
+                    }
+                    case 'h3': {
+                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${content}</w:p>`;
+                    }
+                    case 'h4': {
+                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading4"/></w:pPr>${content}</w:p>`;
+                    }
+                    case 'p': {
+                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
+                        return `<w:p>${content}</w:p>`;
+                    }
                     case 'strong':
                     case 'b':
-                        return `<w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(node.textContent)}</w:t></w:r>`;
+                        return `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(node.textContent)}</w:t></w:r>`;
                     case 'em':
                     case 'i':
-                        return `<w:r><w:rPr><w:i/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(node.textContent)}</w:t></w:r>`;
+                        return `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(node.textContent)}</w:t></w:r>`;
                     case 'code':
                         if (node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre') {
                             return ''; // Handled by pre
                         }
-                        return `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/><w:color w:val="C7254E"/></w:rPr><w:t>${this.escapeXml(node.textContent)}</w:t></w:r>`;
+                        return `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(node.textContent)}</w:t></w:r>`;
                     case 'pre':
                         const codeText = node.textContent;
                         return `<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:color w:val="000000"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(codeText)}</w:t></w:r></w:p>`;
                     case 'ul':
                     case 'ol':
                         return this.processListItems(node, tagName === 'ol');
-                    case 'blockquote':
-                        return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${this.processChildren(node)}</w:p>`;
+                    case 'blockquote': {
+                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
+                        return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${content}</w:p>`;
+                    }
                     case 'table':
                         return this.processTable(node);
                     case 'br':
@@ -232,20 +244,23 @@ class ExportHandler {
         let result = '';
         Array.from(node.childNodes).forEach(child => {
             if (child.nodeType === Node.TEXT_NODE) {
-                const text = child.textContent.trim();
+                const text = child.textContent;
                 if (text) {
                     result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 }
             } else if (child.nodeType === Node.ELEMENT_NODE) {
                 const tagName = child.tagName.toLowerCase();
+                const text = child.textContent;
                 if (tagName === 'strong' || tagName === 'b') {
-                    result += `<w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 } else if (tagName === 'em' || tagName === 'i') {
-                    result += `<w:r><w:rPr><w:i/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 } else if (tagName === 'code') {
-                    result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/><w:color w:val="C7254E"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                } else if (tagName === 'a') {
+                    result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 } else {
-                    result += `<w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
+                    result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 }
             }
         });
@@ -259,12 +274,8 @@ class ExportHandler {
         let result = '';
         const items = listNode.querySelectorAll(':scope > li');
         items.forEach((li, index) => {
-            result += `<w:p>
-                <w:pPr>
-                    <w:pStyle w:val="${isOrdered ? 'ListNumber' : 'ListBullet'}"/>
-                </w:pPr>
-                <w:r><w:t>${this.escapeXml(li.textContent)}</w:t></w:r>
-            </w:p>`;
+            const text = li.textContent.trim() || '';
+            result += `<w:p><w:pPr><w:pStyle w:val="${isOrdered ? 'ListNumber' : 'ListBullet'}"/></w:pPr><w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r></w:p>`;
         });
         return result;
     }
