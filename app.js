@@ -201,12 +201,16 @@ async function exportToHTML() {
     btn.innerHTML = '⏳ Exporting...';
 
     try {
+        // Get theme selection
+        const theme = document.querySelector('input[name="exportTheme"]:checked').value;
+        
         const options = {
             includeStyles: document.getElementById('includeStyles').checked,
             includeTOC: document.getElementById('includeTOC').checked,
             title: 'Document',
             author: 'Converto User',
-            date: new Date().toLocaleDateString()
+            date: new Date().toLocaleDateString(),
+            theme: theme
         };
 
         const result = await exportHandler.exportToHTML(markdown, options);
@@ -241,12 +245,16 @@ async function exportToDOCX() {
     btn.innerHTML = '⏳ Exporting...';
 
     try {
+        // Get theme selection
+        const theme = document.querySelector('input[name="exportTheme"]:checked').value;
+        
         const options = {
             title: 'Document',
             author: 'Converto User',
             date: new Date().toLocaleDateString(),
             includeTOC: document.getElementById('includeTOC').checked,
-            pageNumbers: document.getElementById('pageNumbers').checked
+            pageNumbers: document.getElementById('pageNumbers').checked,
+            theme: theme
         };
 
         const result = await exportHandler.exportToDOCX(markdown, options);
@@ -288,12 +296,16 @@ async function exportToPDF() {
     };
 
     try {
+        // Get theme selection
+        const theme = document.querySelector('input[name="exportTheme"]:checked').value;
+        
         const options = {
             title: 'Document',
             author: 'Converto User',
             date: new Date().toLocaleDateString(),
             includeTOC: document.getElementById('includeTOC').checked,
-            includeStyles: document.getElementById('includeStyles').checked
+            includeStyles: document.getElementById('includeStyles').checked,
+            theme: theme
         };
 
         const result = await exportHandler.exportToPDF(markdown, options, updateStatus);
