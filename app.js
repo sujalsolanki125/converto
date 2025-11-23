@@ -14,8 +14,19 @@ let exportHandler;
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Converto - DOM Ready');
     
+    let initAttempts = 0;
+    const MAX_ATTEMPTS = 50; // 5 seconds max wait
+    
     // Wait for all external libraries to load
     const initializeApp = () => {
+        initAttempts++;
+        
+        if (initAttempts > MAX_ATTEMPTS) {
+            console.error('❌ Initialization timeout - some libraries failed to load');
+            alert('Failed to load required libraries. Please check your internet connection and refresh the page.');
+            return;
+        }
+        
         // Check if all required libraries are loaded
         if (typeof marked === 'undefined') {
             console.log('Waiting for marked library...');
@@ -60,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        console.log('All libraries loaded, initializing modules...');
+        console.log(`✓ All libraries loaded after ${initAttempts} attempts (${initAttempts * 100}ms)`);
         
         // Initialize modules after all dependencies are ready
         try {
