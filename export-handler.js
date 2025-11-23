@@ -110,7 +110,10 @@ class ExportHandler {
             const blob = await zip.generateAsync({ 
                 type: 'blob',
                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                compression: 'DEFLATE'
+                compression: 'STORE',  // Use STORE (no compression) for better compatibility
+                compressionOptions: {
+                    level: 0
+                }
             });
             saveAs(blob, `${this.sanitizeFilename(title)}.docx`);
 
