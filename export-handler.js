@@ -83,10 +83,8 @@ class ExportHandler {
                 date = new Date().toLocaleDateString(),
                 includeTOC = false,
                 pageNumbers = true,
-                theme = 'color'  // Default to color theme (user can choose BW if needed)
+                theme = 'bw'  // Default to black & white for maximum compatibility
             } = options;
-            
-            console.log('🎨 DOCX Export - Theme received:', theme, '| Options:', options);
 
             // Convert markdown to HTML
             const bodyHTML = this.converter.convert(content);
@@ -126,7 +124,7 @@ class ExportHandler {
     /**
      * Create main document.xml content
      */
-    createDocxXml(title, author, date, html, theme = 'color') {
+    createDocxXml(title, author, date, html, theme = 'bw') {
         // Convert HTML to Word XML format
         const wordContent = this.htmlToWordXml(html, theme);
         
@@ -165,7 +163,7 @@ class ExportHandler {
     /**
      * Convert HTML to Word XML paragraphs
      */
-    htmlToWordXml(html, theme = 'color') {
+    htmlToWordXml(html, theme = 'bw') {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         let wordXml = '';
@@ -250,29 +248,26 @@ class ExportHandler {
         Array.from(node.childNodes).forEach(child => {
             if (child.nodeType === Node.TEXT_NODE) {
                 const text = child.textContent;
-                if (text && text.trim()) {  // Only add if there's actual content
+                if (text) {
                     result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 }
             } else if (child.nodeType === Node.ELEMENT_NODE) {
                 const tagName = child.tagName.toLowerCase();
                 const text = child.textContent;
-                if (text && text.trim()) {  // Only process if there's content
-                    if (tagName === 'strong' || tagName === 'b') {
-                        result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                    } else if (tagName === 'em' || tagName === 'i') {
-                        result += `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                    } else if (tagName === 'code') {
-                        result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                    } else if (tagName === 'a') {
-                        result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                    } else {
-                        result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                    }
+                if (tagName === 'strong' || tagName === 'b') {
+                    result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                } else if (tagName === 'em' || tagName === 'i') {
+                    result += `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                } else if (tagName === 'code') {
+                    result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                } else if (tagName === 'a') {
+                    result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                } else {
+                    result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 }
             }
         });
-        // If no content was added, return a single empty run to ensure valid XML
-        return result || '<w:r><w:t></w:t></w:r>';
+        return result;
     }
 
     /**
@@ -390,7 +385,7 @@ class ExportHandler {
     /**
      * Get DOCX styles
      */
-    getDocxStyles(theme = 'color') {
+    getDocxStyles(theme = 'bw') {
         // Theme-specific colors
         const colors = theme === 'bw' ? {
             title: '000000',
@@ -1272,65 +1267,44 @@ class ExportHandler {
             const {
                 title = 'Document',
                 author = '',
-                date = new Date().toLocaleDateString(),
-                theme = 'color'  // Get theme from options
+                date = new Date().toLocaleDateString()
             } = options;
-            
-            console.log('🎨 PDF Export - Theme received:', theme, '| Options:', options);
 
             // Convert markdown to HTML
             const bodyHTML = this.converter.convert(content);
-            
-            // Theme-based colors
-            const colors = theme === 'bw' ? {
-                background: '#ffffff',
-                text: '#000000',
-                heading: '#000000',
-                border: '#000000',
-                subtitle: '#404040',
-                date: '#666666',
-                accent: '#000000'
-            } : {
-                background: '#0f172a',
-                text: '#ffffff',
-                heading: '#66e4ff',
-                border: '#66e4ff',
-                subtitle: '#94a3b8',
-                date: '#64748b',
-                accent: '#66e4ff'
-            };
 
             // Create container for PDF
             const element = document.createElement('div');
+            // Use dark theme to match preview
             element.style.cssText = `
                 width: 100%;
-                background: ${colors.background};
+                background: #0f172a;
                 font-family: 'Segoe UI', 'Calibri', 'Arial', sans-serif;
                 font-size: 11pt;
                 line-height: 1.6;
-                color: ${colors.text};
+                color: #ffffff;
                 padding: 20px;
             `;
 
             // Build HTML structure
             element.innerHTML = `
-                <div style="padding-bottom: 10px; margin-bottom: 20px; border-bottom: 2px solid ${colors.border};">
-                    <h1 style="margin: 0; font-size: 24pt; color: ${colors.heading}; text-align: center;">${title}</h1>
-                    ${author ? `<p style="margin: 5px 0 0; color: ${colors.subtitle}; font-size: 11pt; text-align: center;">By ${author}</p>` : ''}
-                    <p style="margin: 0; font-size: 10pt; color: ${colors.date}; text-align: center;">${date}</p>
+                <div style="padding-bottom: 10px; margin-bottom: 20px; border-bottom: 2px solid #66e4ff;">
+                    <h1 style="margin: 0; font-size: 24pt; color: #66e4ff; text-align: center;">${title}</h1>
+                    ${author ? `<p style="margin: 5px 0 0; color: #94a3b8; font-size: 11pt; text-align: center;">By ${author}</p>` : ''}
+                    <p style="margin: 0; font-size: 10pt; color: #64748b; text-align: center;">${date}</p>
                 </div>
 
                 <div class="pdf-content">
                     ${bodyHTML}
                 </div>
 
-                <div style="margin-top: 30px; padding-top: 10px; border-top: 1px solid ${theme === 'bw' ? '#cccccc' : 'rgba(255, 255, 255, 0.1)'}; text-align: center; font-size: 9pt; color: ${colors.date};">
+                <div style="margin-top: 30px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center; font-size: 9pt; color: #64748b;">
                     Page <span class="pageNumber"></span>
                 </div>
             `;
 
             // Apply inline styles to content
-            this.applyPDFStyles(element, theme);
+            this.applyPDFStyles(element);
 
             // Optimized PDF configuration
             const opt = {
@@ -1341,7 +1315,7 @@ class ExportHandler {
                     scale: 2, 
                     useCORS: true,
                     scrollY: 0,
-                    backgroundColor: colors.background,
+                    backgroundColor: '#0f172a', // Dark background
                     logging: false
                 },
                 jsPDF: { 
@@ -1367,60 +1341,23 @@ class ExportHandler {
     /**
      * Apply PDF-specific styles to elements
      */
-    applyPDFStyles(container, theme = 'color') {
-        // Theme-based colors
-        const colors = theme === 'bw' ? {
-            heading1: '#000000',
-            heading2: '#000000',
-            heading3: '#000000',
-            codeBg: '#f5f5f5',
-            codeText: '#000000',
-            codeBorder: '#cccccc',
-            tableBg: '#f9f9f9',
-            tableHeaderBg: '#e0e0e0',
-            tableHeaderText: '#000000',
-            tableBorder: '#cccccc',
-            tableText: '#000000',
-            blockquoteBorder: '#666666',
-            blockquoteText: '#404040',
-            blockquoteBg: '#f5f5f5',
-            linkColor: '#000000',
-            headingBorder: '#cccccc'
-        } : {
-            heading1: '#66e4ff',
-            heading2: '#d946ef',
-            heading3: '#66e4ff',
-            codeBg: '#1e293b',
-            codeText: '#e2e8f0',
-            codeBorder: 'rgba(255, 255, 255, 0.1)',
-            tableBg: 'rgba(255, 255, 255, 0.02)',
-            tableHeaderBg: 'rgba(102, 228, 255, 0.1)',
-            tableHeaderText: '#66e4ff',
-            tableBorder: 'rgba(255, 255, 255, 0.1)',
-            tableText: '#e2e8f0',
-            blockquoteBorder: '#d946ef',
-            blockquoteText: '#94a3b8',
-            blockquoteBg: 'rgba(255, 255, 255, 0.02)',
-            linkColor: '#66e4ff',
-            headingBorder: 'rgba(255, 255, 255, 0.1)'
-        };
-        
+    applyPDFStyles(container) {
         // Style headings
         const h1s = container.querySelectorAll('.pdf-content h1');
-        h1s.forEach(h => h.style.cssText = `font-size: 20pt; color: ${colors.heading1}; border-bottom: 1px solid ${colors.headingBorder}; padding-bottom: 5px; margin-top: 20px;`);
+        h1s.forEach(h => h.style.cssText = 'font-size: 20pt; color: #66e4ff; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 5px; margin-top: 20px;');
 
         const h2s = container.querySelectorAll('.pdf-content h2');
-        h2s.forEach(h => h.style.cssText = `font-size: 16pt; color: ${colors.heading2}; margin-top: 15px; margin-bottom: 8px; font-weight: 600;`);
+        h2s.forEach(h => h.style.cssText = 'font-size: 16pt; color: #d946ef; margin-top: 15px; margin-bottom: 8px; font-weight: 600;');
         
         const h3s = container.querySelectorAll('.pdf-content h3');
-        h3s.forEach(h => h.style.cssText = `font-size: 14pt; color: ${colors.heading3}; margin-top: 12px; margin-bottom: 6px; font-weight: 600;`);
+        h3s.forEach(h => h.style.cssText = 'font-size: 14pt; color: #66e4ff; margin-top: 12px; margin-bottom: 6px; font-weight: 600;');
 
         // Code Blocks
         const codeBlocks = container.querySelectorAll('pre');
         codeBlocks.forEach(pre => {
             pre.style.cssText = `
-                background: ${colors.codeBg} !important; 
-                color: ${colors.codeText} !important; 
+                background: #1e293b !important; 
+                color: #e2e8f0 !important; 
                 padding: 15px; 
                 border-radius: 5px; 
                 margin: 10px 0; 
@@ -1429,9 +1366,9 @@ class ExportHandler {
                 white-space: pre-wrap; 
                 overflow-x: hidden; 
                 page-break-inside: avoid;
-                border: 1px solid ${colors.codeBorder};
+                border: 1px solid rgba(255, 255, 255, 0.1);
             `;
-            // Reset inner code styles so they inherit the text color
+            // Reset inner code styles so they inherit the white text
             const code = pre.querySelector('code');
             if (code) code.style.cssText = 'background: transparent !important; color: inherit !important; padding: 0;';
         });
@@ -1439,23 +1376,23 @@ class ExportHandler {
         // Table Styling
         const tables = container.querySelectorAll('table');
         tables.forEach(table => {
-            table.style.cssText = `width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; font-size: 10pt; border: 1px solid ${colors.tableBorder}; background: ${colors.tableBg};`;
+            table.style.cssText = 'width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; font-size: 10pt; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.02);';
             
             const ths = table.querySelectorAll('th');
             ths.forEach(th => {
-                th.style.cssText = `background: ${colors.tableHeaderBg}; color: ${colors.tableHeaderText}; padding: 8px; border: 1px solid ${colors.tableBorder}; text-align: left; font-weight: bold;`;
+                th.style.cssText = 'background: rgba(102, 228, 255, 0.1); color: #66e4ff; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: left; font-weight: bold;';
             });
             
             const tds = table.querySelectorAll('td');
             tds.forEach(td => {
-                td.style.cssText = `padding: 8px; border: 1px solid ${colors.tableBorder}; color: ${colors.tableText};`;
+                td.style.cssText = 'padding: 8px; border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0;';
             });
         });
 
         // Style Blockquotes
         const blockquotes = container.querySelectorAll('blockquote');
         blockquotes.forEach(bq => {
-            bq.style.cssText = `border-left: 4px solid ${colors.blockquoteBorder}; padding-left: 15px; margin: 10px 0; color: ${colors.blockquoteText}; font-style: italic; background: ${colors.blockquoteBg}; padding: 10px; border-radius: 0 4px 4px 0;`;
+            bq.style.cssText = 'border-left: 4px solid #d946ef; padding-left: 15px; margin: 10px 0; color: #94a3b8; font-style: italic; background: rgba(255, 255, 255, 0.02); padding: 10px; border-radius: 0 4px 4px 0;';
         });
         
         // Images
@@ -1468,23 +1405,9 @@ class ExportHandler {
         // Links
         const links = container.querySelectorAll('a');
         links.forEach(a => {
-            a.style.color = colors.linkColor;
-            a.style.textDecoration = theme === 'bw' ? 'underline' : 'none';
+            a.style.color = '#66e4ff';
+            a.style.textDecoration = 'none';
         });
-        
-        // Math Formulas (KaTeX) - Force black color for B&W theme
-        if (theme === 'bw') {
-            const mathElements = container.querySelectorAll('.katex, .katex-html, .katex-display, .katex *');
-            mathElements.forEach(math => {
-                math.style.setProperty('color', '#000000', 'important');
-            });
-            
-            // Also target specific KaTeX classes
-            const katexSpecific = container.querySelectorAll('.katex-mathml, .mord, .mbin, .mrel, .mopen, .mclose, .mpunct, .minner, .mop');
-            katexSpecific.forEach(elem => {
-                elem.style.setProperty('color', '#000000', 'important');
-            });
-        }
     }
 
     /**
