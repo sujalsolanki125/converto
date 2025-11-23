@@ -42,8 +42,20 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(initializeApp, 100);
             return;
         }
-        if (typeof saveAs === 'undefined') {
-            console.log('Waiting for FileSaver library...');
+        
+        // Check if our custom classes are defined
+        if (typeof ContentGenerator === 'undefined') {
+            console.log('Waiting for ContentGenerator class...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof MarkdownConverter === 'undefined') {
+            console.log('Waiting for MarkdownConverter class...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof ExportHandler === 'undefined') {
+            console.log('Waiting for ExportHandler class...');
             setTimeout(initializeApp, 100);
             return;
         }
@@ -76,8 +88,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    // Start initialization
-    initializeApp();
+    // Start initialization with a small delay to ensure scripts are parsed
+    setTimeout(initializeApp, 50);
 });
 
 /**
