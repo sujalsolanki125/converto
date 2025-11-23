@@ -1,11 +1,49 @@
 /**
  * Export Handler
- * Handles export to DOCX, HTML, and PDF formats with formatting preservation
+ * Handles export to DOCX, HTML, and PDF formats with theme support
+ * Supports both "color" and "bw" (black & white) themes
  */
 
 class ExportHandler {
     constructor() {
         this.converter = new MarkdownConverter();
+    }
+
+    /**
+     * Unified export API
+     * @param {Object} options - Export options
+     * @param {string} options.format - Export format: "pdf" | "docx" | "html"
+     * @param {string} options.theme - Theme: "color" | "bw"
+     * @param {string} options.content - Markdown content
+     * @param {string} options.fileName - Optional file name
+     * @param {string} options.title - Document title
+     * @param {string} options.author - Document author
+     */
+    async exportDocument(options) {
+        const {
+            format = 'pdf',
+            theme = 'color',
+            content = '',
+            fileName = 'document',
+            title = 'Document',
+            author = ''
+        } = options;
+
+        try {
+            switch (format.toLowerCase()) {
+                case 'pdf':
+                    return await this.exportToPDF(content, { theme, title, author, fileName });
+                case 'docx':
+                    return await this.exportToDOCX(content, { theme, title, author, fileName });
+                case 'html':
+                    return await this.exportToHTML(content, { theme, title, author, fileName });
+                default:
+                    throw new Error(`Unsupported format: ${format}`);
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            return { success: false, error: error.message };
+        }
     }
 
     /**
@@ -81,15 +119,15 @@ class ExportHandler {
                 title = 'Document',
                 author = '',
                 date = new Date().toLocaleDateString(),
-                includeTOC = false,
-                pageNumbers = true
+                theme = 'bw',
+                fileName = 'document'
             } = options;
 
             // Convert markdown to HTML
             const bodyHTML = this.converter.convert(content);
 
             // Create Office Open XML structure for DOCX
-            const docXml = this.createDocxXml(title, author, date, bodyHTML);
+            const docXml = this.createDocxXml(title, author, date, bodyHTML, theme);
             
             // Create DOCX using JSZip
             const zip = new JSZip();
@@ -101,7 +139,7 @@ class ExportHandler {
             zip.file('docProps/core.xml', this.getDocxCoreProps(title, author));
             zip.file('word/_rels/document.xml.rels', this.getDocxDocumentRels());
             zip.file('word/document.xml', docXml);
-            zip.file('word/styles.xml', this.getDocxStyles());
+            zip.file('word/styles.xml', this.getDocxStyles(theme));
             zip.file('word/fontTable.xml', this.getDocxFontTable());
             zip.file('word/settings.xml', this.getDocxSettings());
             
@@ -111,7 +149,9 @@ class ExportHandler {
                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 compression: 'DEFLATE'
             });
-            saveAs(blob, `${this.sanitizeFilename(title)}.docx`);
+            
+            const finalFileName = `${this.sanitizeFilename(fileName || title)}.docx`;
+            saveAs(blob, finalFileName);
 
             return { success: true, message: 'DOCX exported successfully' };
         } catch (error) {
@@ -123,9 +163,9 @@ class ExportHandler {
     /**
      * Create main document.xml content
      */
-    createDocxXml(title, author, date, html) {
+    createDocxXml(title, author, date, html, theme = 'bw') {
         // Convert HTML to Word XML format
-        const wordContent = this.htmlToWordXml(html);
+        const wordContent = this.htmlToWordXml(html, theme);
         
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
@@ -159,7 +199,7 @@ class ExportHandler {
     /**
      * Convert HTML to Word XML paragraphs
      */
-    htmlToWordXml(html) {
+    htmlToWordXml(html, theme = 'bw') {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         let wordXml = '';
@@ -207,7 +247,7 @@ class ExportHandler {
                     case 'blockquote':
                         return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${this.processChildren(node)}</w:p>`;
                     case 'table':
-                        return this.processTable(node);
+                        return this.processTable(node, theme);
                     case 'br':
                         return '<w:r><w:br/></w:r>';
                     default:
@@ -271,7 +311,8 @@ class ExportHandler {
     /**
      * Process table
      */
-    processTable(tableNode) {
+    processTable(tableNode, theme = 'bw') {
+        const headerFill = theme === 'color' ? 'D9E2F3' : 'E0E0E0';
         let result = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/></w:tblPr>';
         
         const rows = tableNode.querySelectorAll('tr');
@@ -281,7 +322,7 @@ class ExportHandler {
             cells.forEach(cell => {
                 const isHeader = cell.tagName.toLowerCase() === 'th';
                 result += `<w:tc>
-                    <w:tcPr>${isHeader ? '<w:shd w:fill="D9E2F3"/>' : ''}</w:tcPr>
+                    <w:tcPr>${isHeader ? `<w:shd w:fill="${headerFill}"/>` : ''}</w:tcPr>
                     <w:p><w:r>${isHeader ? '<w:rPr><w:b/><w:color w:val="000000"/></w:rPr>' : '<w:rPr><w:color w:val="000000"/></w:rPr>'}<w:t>${this.escapeXml(cell.textContent)}</w:t></w:r></w:p>
                 </w:tc>`;
             });
@@ -362,9 +403,296 @@ class ExportHandler {
     }
 
     /**
-     * Get DOCX styles
+     * Get DOCX styles based on theme
+     * @param {string} theme - "color" or "bw"
      */
-    getDocxStyles() {
+    getDocxStyles(theme = 'bw') {
+        const isColor = theme === 'color';
+        
+        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    <w:docDefaults>
+        <w:rPrDefault>
+            <w:rPr>
+                <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Times New Roman"/>
+                <w:sz w:val="22"/>
+                <w:szCs w:val="22"/>
+                <w:lang w:val="en-US" w:eastAsia="en-US" w:bidi="ar-SA"/>
+            </w:rPr>
+        </w:rPrDefault>
+        <w:pPrDefault>
+            <w:pPr>
+                <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
+            </w:pPr>
+        </w:pPrDefault>
+    </w:docDefaults>
+    <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+        <w:name w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+            <w:sz w:val="22"/>
+            <w:color w:val="000000"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont">
+        <w:name w:val="Default Paragraph Font"/>
+        <w:uiPriority w:val="1"/>
+        <w:semiHidden/>
+        <w:unhideWhenUsed/>
+    </w:style>
+    <w:style w:type="table" w:default="1" w:styleId="TableNormal">
+        <w:name w:val="Normal Table"/>
+        <w:uiPriority w:val="99"/>
+        <w:semiHidden/>
+        <w:unhideWhenUsed/>
+        <w:tblPr>
+            <w:tblInd w:w="0" w:type="dxa"/>
+            <w:tblCellMar>
+                <w:top w:w="0" w:type="dxa"/>
+                <w:left w:w="108" w:type="dxa"/>
+                <w:bottom w:w="0" w:type="dxa"/>
+                <w:right w:w="108" w:type="dxa"/>
+            </w:tblCellMar>
+        </w:tblPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Title">
+        <w:name w:val="Title"/>
+        <w:basedOn w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:before="240" w:after="200"/>
+            <w:jc w:val="center"/>
+        </w:pPr>
+        <w:rPr>
+            <w:b/>
+            <w:sz w:val="56"/>
+            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Subtitle">
+        <w:name w:val="Subtitle"/>
+        <w:basedOn w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:spacing w:after="120"/>
+            <w:jc w:val="center"/>
+        </w:pPr>
+        <w:rPr>
+            <w:i/>
+            <w:sz w:val="28"/>
+            <w:color w:val="${isColor ? '595959' : '404040'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading1">
+        <w:name w:val="Heading 1"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:spacing w:before="480" w:after="240"/>
+        </w:pPr>
+        <w:rPr>
+            <w:b/>
+            <w:sz w:val="36"/>
+            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading2">
+        <w:name w:val="Heading 2"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:spacing w:before="320" w:after="160"/>
+        </w:pPr>
+        <w:rPr>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading3">
+        <w:name w:val="Heading 3"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:spacing w:before="240" w:after="120"/>
+        </w:pPr>
+        <w:rPr>
+            <w:b/>
+            <w:sz w:val="24"/>
+            <w:color w:val="${isColor ? '1F4D78' : '000000'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Heading4">
+        <w:name w:val="Heading 4"/>
+        <w:basedOn w:val="Normal"/>
+        <w:next w:val="Normal"/>
+        <w:qFormat/>
+        <w:pPr>
+            <w:keepNext/>
+            <w:spacing w:before="160" w:after="80"/>
+        </w:pPr>
+        <w:rPr>
+            <w:b/>
+            <w:i/>
+            <w:sz w:val="22"/>
+            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="CodeBlock">
+        <w:name w:val="Code Block"/>
+        <w:basedOn w:val="Normal"/>
+        <w:pPr>
+            <w:spacing w:before="200" w:after="200"/>
+            <w:shd w:fill="${isColor ? 'F2F2F2' : 'F5F5F5'}"/>
+        </w:pPr>
+        <w:rPr>
+            <w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>
+            <w:sz w:val="20"/>
+            <w:color w:val="000000"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="Quote">
+        <w:name w:val="Quote"/>
+        <w:basedOn w:val="Normal"/>
+        <w:pPr>
+            <w:ind w:left="720"/>
+            <w:spacing w:before="200" w:after="200"/>
+        </w:pPr>
+        <w:rPr>
+            <w:i/>
+            <w:color w:val="${isColor ? '595959' : '404040'}"/>
+        </w:rPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="ListBullet">
+        <w:name w:val="List Bullet"/>
+        <w:basedOn w:val="Normal"/>
+        <w:pPr>
+            <w:ind w:left="720"/>
+        </w:pPr>
+    </w:style>
+    <w:style w:type="paragraph" w:styleId="ListNumber">
+        <w:name w:val="List Number"/>
+        <w:basedOn w:val="Normal"/>
+        <w:pPr>
+            <w:ind w:left="720"/>
+        </w:pPr>
+    </w:style>
+    <w:style w:type="table" w:styleId="TableGrid">
+        <w:name w:val="Table Grid"/>
+        <w:basedOn w:val="TableNormal"/>
+        <w:uiPriority w:val="39"/>
+        <w:tblPr>
+            <w:tblBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
+                <w:insideH w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
+                <w:insideV w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
+            </w:tblBorders>
+        </w:tblPr>
+    </w:style>
+</w:styles>`;
+    }
+
+    /**
+     * Sanitize filename for safe file system use
+     */
+    sanitizeFilename(filename) {
+        return filename
+            .replace(/[^a-z0-9_\-]/gi, '_')
+            .replace(/_{2,}/g, '_')
+            .replace(/^_|_$/g, '');
+    }
+
+    /**
+     * Create hidden export container for theme-specific rendering
+     */
+    createHiddenExportContainer(html, theme) {
+        const container = document.createElement('div');
+        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;';
+        container.innerHTML = html;
+        
+        if (theme === 'bw') {
+            this.applyBlackWhiteOverrides(container);
+        }
+        
+        document.body.appendChild(container);
+        return container;
+    }
+
+    /**
+     * Apply black & white styling overrides
+     */
+    applyBlackWhiteOverrides(element) {
+        // Apply BW class
+        element.classList.add('export-bw');
+        
+        // Override colors
+        const style = document.createElement('style');
+        style.textContent = `
+            .export-bw {
+                background: white !important;
+                color: black !important;
+            }
+            .export-bw h1, .export-bw h2, .export-bw h3, .export-bw h4, .export-bw h5, .export-bw h6 {
+                color: black !important;
+                border-color: #ccc !important;
+            }
+            .export-bw code {
+                background: #f5f5f5 !important;
+                color: black !important;
+                border-color: #ddd !important;
+            }
+            .export-bw pre {
+                background: #f5f5f5 !important;
+                color: black !important;
+                border-color: #ddd !important;
+            }
+            .export-bw table {
+                background: white !important;
+                border-color: black !important;
+            }
+            .export-bw th {
+                background: #e0e0e0 !important;
+                color: black !important;
+                border-color: black !important;
+            }
+            .export-bw td {
+                background: white !important;
+                color: black !important;
+                border-color: black !important;
+            }
+            .export-bw blockquote {
+                color: #404040 !important;
+                border-color: #666 !important;
+                background: #f9f9f9 !important;
+            }
+            .export-bw .highlight-yellow,
+            .export-bw .highlight-green,
+            .export-bw .highlight-blue {
+                background: transparent !important;
+                font-weight: bold !important;
+                text-decoration: underline !important;
+                color: black !important;
+            }
+            .export-bw .katex {
+                color: black !important;
+            }
+        `;
+        element.appendChild(style);
+    }
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
