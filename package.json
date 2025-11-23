@@ -1,0 +1,29 @@
+{
+  "name": "bibcit-export-tools",
+  "version": "1.0.0",
+  "description": "Advanced content export system with formatting, citations, and multi-format support",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 8080 -o",
+    "dev": "npx live-server --port=8080"
+  },
+  "keywords": [
+    "export",
+    "docx",
+    "pdf",
+    "html",
+    "markdown",
+    "citations",
+    "formatting"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "docx": "^8.5.0",
+    "file-saver": "^2.0.5",
+    "html2pdf.js": "^0.10.1",
+    "marked": "^11.1.1",
+    "highlight.js": "^11.9.0",
+    "katex": "^0.16.9"
+  }
+}

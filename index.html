@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Converto - Professional Document Export Tool</title>
+    
+    <!-- KaTeX for Math Equations -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    
+    <!-- Highlight.js for Code Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <div class="logo">Converto</div>
+                <p class="tagline">Transform AI-generated content into professional documents</p>
+            </div>
+            <div class="header-right">
+                <button onclick="toggleHowToUse()" class="btn btn-how-to-use" title="How to Use">
+                    <span>❓</span> How to Use
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Editor Section -->
+            <section class="editor-section">
+                <div class="toolbar">
+                    <button onclick="insertTable()" class="btn btn-tool" title="Insert Table">
+                        <span>📊</span> Table
+                    </button>
+                    <button onclick="insertEquation()" class="btn btn-tool" title="Insert Math Equation">
+                        <span>∑</span> Equation
+                    </button>
+                    <button onclick="insertCode()" class="btn btn-tool" title="Insert Code">
+                        <span>💻</span> Code
+                    </button>
+                    <button onclick="triggerImageUpload()" class="btn btn-tool" title="Insert Image">
+                        <span>🖼️</span> Image
+                    </button>
+                    <button onclick="insertHighlight()" class="btn btn-tool" title="Add Highlight">
+                        <span>🖍️</span> Highlight
+                    </button>
+                    <button onclick="loadSampleContent()" class="btn btn-tool" title="Load Sample Content">
+                        <span>📄</span> Load Sample
+                    </button>
+                </div>
+                
+                <!-- Hidden file input for image upload -->
+                <input type="file" id="imageUpload" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event)">
+
+                <div class="editor-container">
+                    <textarea id="markdownInput" placeholder="Paste your content from ChatGPT, Gemini, Claude or any AI tool here...
+
+Supports:
+• Mathematical equations ($inline$ or $$display$$)
+• Code blocks with syntax highlighting
+• Tables, lists, and formatted text
+• Highlights and special formatting
+
+Click 'Load Sample' to see an example."></textarea>
+                </div>
+            </section>
+
+            <!-- Preview Section -->
+            <section class="preview-section">
+                <div class="preview-toolbar">
+                    <h3>Live Preview</h3>
+                    <div class="preview-toolbar-actions">
+                        <button onclick="toggleEditMode()" class="btn btn-secondary" id="editModeBtn">
+                            ✏️ Enable Editing
+                        </button>
+                        <button onclick="updatePreview()" class="btn btn-primary">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Editing Toolbar (hidden by default) -->
+                <div id="editToolbar" class="edit-toolbar hidden">
+                    <div class="edit-toolbar-group">
+                        <button onclick="formatText('bold')" class="btn btn-tool" title="Bold">
+                            <strong>B</strong>
+                        </button>
+                        <button onclick="formatText('italic')" class="btn btn-tool" title="Italic">
+                            <em>I</em>
+                        </button>
+                        <button onclick="formatText('underline')" class="btn btn-tool" title="Underline">
+                            <u>U</u>
+                        </button>
+                        <button onclick="formatText('strikethrough')" class="btn btn-tool" title="Strikethrough">
+                            <s>S</s>
+                        </button>
+                    </div>
+                    <div class="edit-toolbar-separator"></div>
+                    <div class="edit-toolbar-group">
+                        <button onclick="formatText('removeFormat')" class="btn btn-tool" title="Remove Formatting">
+                            🧹 Clear
+                        </button>
+                        <button onclick="deleteSelectedText()" class="btn btn-tool" title="Delete Selected Text">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                    <div class="edit-toolbar-separator"></div>
+                    <div class="edit-toolbar-group">
+                        <button onclick="undoEdit()" class="btn btn-tool" title="Undo">
+                            ↶ Undo
+                        </button>
+                        <button onclick="redoEdit()" class="btn btn-tool" title="Redo">
+                            ↷ Redo
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Content Statistics -->
+                <div id="contentStats" class="content-stats hidden">
+                    <div class="stat-item">
+                        <span class="stat-value" id="wordCount">0</span>
+                        <span class="stat-label">Words</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="charCount">0</span>
+                        <span class="stat-label">Characters</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="paraCount">0</span>
+                        <span class="stat-label">Paragraphs</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="headingCount">0</span>
+                        <span class="stat-label">Headings</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="readTime">0</span>
+                        <span class="stat-label">Min Read</span>
+                    </div>
+                </div>
+                
+                <div id="preview" class="preview-container">
+                    <p class="placeholder">Your formatted content will appear here...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Export Section -->
+        <section class="export-section">
+            <h3>💾 Export Options</h3>
+            <div class="export-buttons">
+                <button onclick="exportToHTML()" class="btn btn-export btn-html">
+                    🌐 Export to HTML
+                </button>
+                <button onclick="exportToDOCX()" class="btn btn-export btn-docx">
+                    📄 Export to DOCX
+                </button>
+                <button onclick="exportToPDF()" class="btn btn-export btn-pdf">
+                    📕 Export to PDF
+                </button>
+                <button onclick="copyFormattedContent()" class="btn btn-export btn-copy">
+                    📋 Copy Formatted
+                </button>
+            </div>
+            
+            <div class="export-options">
+                <label>
+                    <input type="checkbox" id="includeStyles" checked> Include Styling
+                </label>
+                <label>
+                    <input type="checkbox" id="includeTOC"> Include Table of Contents
+                </label>
+                <label>
+                    <input type="checkbox" id="pageNumbers" checked> Page Numbers
+                </label>
+            </div>
+        </section>
+
+        <footer id="howToUseSection" class="hidden">
+            <div class="footer-content">
+                <h3>How Converto Works</h3>
+                <p class="footer-description">Get AI-generated content from ChatGPT, Gemini, Claude, or any AI tool and export them with perfect formatting.</p>
+                
+                <div class="footer-steps">
+                    <div class="step">
+                        <span class="step-number">1</span>
+                        <div class="step-content">
+                            <h4>Install Extension</h4>
+                            <p>Download "Markdown Copy" or similar Chrome extension to copy AI content in markdown format</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step">
+                        <span class="step-number">2</span>
+                        <div class="step-content">
+                            <h4>Copy Content</h4>
+                            <p>Copy your generated content via the extension button - it preserves all formatting, equations, and code blocks</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step">
+                        <span class="step-number">3</span>
+                        <div class="step-content">
+                            <h4>Paste & Export</h4>
+                            <p>Simply paste here and export to DOCX, HTML, or PDF with one click - all formatting preserved perfectly!</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="features-section">
+                    <h3>Core Features</h3>
+                    <div class="features-grid">
+                        <div class="feature-item">
+                            <span class="feature-icon">📝</span>
+                            <h4>Markdown Conversion</h4>
+                            <p>Advanced markdown parsing with support for tables, math, and code</p>
+                        </div>
+                        
+                        <div class="feature-item">
+                            <span class="feature-icon">🧮</span>
+                            <h4>Math Support</h4>
+                            <p>Renders mathematical equations (inline or display) using KaTeX</p>
+                        </div>
+                        
+                        <div class="feature-item">
+                            <span class="feature-icon">💻</span>
+                            <h4>Code Highlighting</h4>
+                            <p>Provides code blocks with syntax highlighting using </p>
+                        </div>
+                        
+                        <div class="feature-item">
+                            <span class="feature-icon">📊</span>
+                            <h4>Content Elements</h4>
+                            <p>Supports tables, lists, formatted text, highlights, and blockquotes</p>
+                        </div>
+                        
+                        <div class="feature-item">
+                            <span class="feature-icon">📈</span>
+                            <h4>Content Statistics</h4>
+                            <p>Provides word count, character count, paragraph count, heading count, and reading time</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer-bottom">
+                    <p>Converto • Professional Document Export Tool • Preserves all formatting</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    
+    <!-- DOCX Generation Library - Using PizZip and Docxtemplater for browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- PDF Generation - Back to html2pdf with optimizations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="content-generator.js"></script>
+    <script src="markdown-converter.js"></script>
+    <script src="export-handler.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
