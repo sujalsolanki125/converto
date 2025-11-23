@@ -82,14 +82,15 @@ class ExportHandler {
                 author = '',
                 date = new Date().toLocaleDateString(),
                 includeTOC = false,
-                pageNumbers = true
+                pageNumbers = true,
+                theme = 'color'
             } = options;
 
             // Convert markdown to HTML
             const bodyHTML = this.converter.convert(content);
 
             // Create Office Open XML structure for DOCX
-            const docXml = this.createDocxXml(title, author, date, bodyHTML);
+            const docXml = this.createDocxXml(title, author, date, bodyHTML, theme);
             
             // Create DOCX using JSZip
             const zip = new JSZip();
@@ -101,7 +102,7 @@ class ExportHandler {
             zip.file('docProps/core.xml', this.getDocxCoreProps(title, author));
             zip.file('word/_rels/document.xml.rels', this.getDocxDocumentRels());
             zip.file('word/document.xml', docXml);
-            zip.file('word/styles.xml', this.getDocxStyles());
+            zip.file('word/styles.xml', this.getDocxStyles(theme));
             zip.file('word/fontTable.xml', this.getDocxFontTable());
             zip.file('word/settings.xml', this.getDocxSettings());
             
@@ -123,9 +124,9 @@ class ExportHandler {
     /**
      * Create main document.xml content
      */
-    createDocxXml(title, author, date, html) {
+    createDocxXml(title, author, date, html, theme = 'color') {
         // Convert HTML to Word XML format
-        const wordContent = this.htmlToWordXml(html);
+        const wordContent = this.htmlToWordXml(html, theme);
         
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
@@ -159,7 +160,7 @@ class ExportHandler {
     /**
      * Convert HTML to Word XML paragraphs
      */
-    htmlToWordXml(html) {
+    htmlToWordXml(html, theme = 'color') {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         let wordXml = '';
@@ -364,7 +365,32 @@ class ExportHandler {
     /**
      * Get DOCX styles
      */
-    getDocxStyles() {
+    getDocxStyles(theme = 'color') {
+        // Theme-specific colors
+        const colors = theme === 'bw' ? {
+            title: '000000',
+            subtitle: '000000',
+            heading1: '000000',
+            heading2: '000000',
+            heading3: '000000',
+            heading4: '000000',
+            normal: '000000',
+            quote: '404040',
+            codeBg: 'F5F5F5',
+            codeText: '000000'
+        } : {
+            title: '2E74B5',
+            subtitle: '595959',
+            heading1: '2E74B5',
+            heading2: '2E74B5',
+            heading3: '1F4D78',
+            heading4: '2E74B5',
+            normal: '000000',
+            quote: '595959',
+            codeBg: 'F2F2F2',
+            codeText: '000000'
+        };
+        
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -427,7 +453,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="56"/>
-            <w:color w:val="2E74B5"/>
+            <w:color w:val="${colors.title}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Subtitle">
@@ -441,7 +467,7 @@ class ExportHandler {
         <w:rPr>
             <w:i/>
             <w:sz w:val="28"/>
-            <w:color w:val="595959"/>
+            <w:color w:val="${colors.subtitle}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading1">
@@ -456,7 +482,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="36"/>
-            <w:color w:val="2E74B5"/>
+            <w:color w:val="${colors.heading1}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading2">
@@ -471,7 +497,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="28"/>
-            <w:color w:val="2E74B5"/>
+            <w:color w:val="${colors.heading2}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading3">
@@ -486,7 +512,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="24"/>
-            <w:color w:val="1F4D78"/>
+            <w:color w:val="${colors.heading3}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading4">
@@ -502,7 +528,7 @@ class ExportHandler {
             <w:b/>
             <w:i/>
             <w:sz w:val="22"/>
-            <w:color w:val="2E74B5"/>
+            <w:color w:val="${colors.heading4}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="CodeBlock">
@@ -510,12 +536,12 @@ class ExportHandler {
         <w:basedOn w:val="Normal"/>
         <w:pPr>
             <w:spacing w:before="200" w:after="200"/>
-            <w:shd w:fill="F2F2F2"/>
+            <w:shd w:fill="${colors.codeBg}"/>
         </w:pPr>
         <w:rPr>
             <w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>
             <w:sz w:val="20"/>
-            <w:color w:val="000000"/>
+            <w:color w:val="${colors.codeText}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Quote">
@@ -527,7 +553,7 @@ class ExportHandler {
         </w:pPr>
         <w:rPr>
             <w:i/>
-            <w:color w:val="595959"/>
+            <w:color w:val="${colors.quote}"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="ListBullet">
