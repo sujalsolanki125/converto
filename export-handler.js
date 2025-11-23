@@ -1468,6 +1468,19 @@ class ExportHandler {
             a.style.color = colors.linkColor;
             a.style.textDecoration = theme === 'bw' ? 'underline' : 'none';
         });
+        
+        // Math Formulas (KaTeX) - Force black color for B&W theme
+        const mathElements = container.querySelectorAll('.katex, .katex-html, .katex-display');
+        mathElements.forEach(math => {
+            if (theme === 'bw') {
+                math.style.color = '#000000';
+                // Also set color for all child elements
+                const allSpans = math.querySelectorAll('*');
+                allSpans.forEach(span => {
+                    span.style.color = '#000000';
+                });
+            }
+        });
     }
 
     /**
