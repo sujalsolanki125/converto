@@ -15,58 +15,35 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Converto - DOM Ready');
     
     let initAttempts = 0;
-    const MAX_ATTEMPTS = 50; // 5 seconds max wait
+    const MAX_ATTEMPTS = 100; // 10 seconds max wait (100 * 100ms)
     
     // Wait for all external libraries to load
     const initializeApp = () => {
         initAttempts++;
         
-        if (initAttempts > MAX_ATTEMPTS) {
-            console.error('❌ Initialization timeout - some libraries failed to load');
-            alert('Failed to load required libraries. Please check your internet connection and refresh the page.');
-            return;
-        }
-        
         // Check if all required libraries are loaded
-        if (typeof marked === 'undefined') {
-            console.log('Waiting for marked library...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
-        if (typeof hljs === 'undefined') {
-            console.log('Waiting for highlight.js library...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
-        if (typeof katex === 'undefined') {
-            console.log('Waiting for KaTeX library...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
-        if (typeof JSZip === 'undefined') {
-            console.log('Waiting for JSZip library...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
-        if (typeof html2pdf === 'undefined') {
-            console.log('Waiting for html2pdf library...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
+        const missingLibraries = [];
         
-        // Check if our custom classes are defined
-        if (typeof ContentGenerator === 'undefined') {
-            console.log('Waiting for ContentGenerator class...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
-        if (typeof MarkdownConverter === 'undefined') {
-            console.log('Waiting for MarkdownConverter class...');
-            setTimeout(initializeApp, 100);
-            return;
-        }
-        if (typeof ExportHandler === 'undefined') {
-            console.log('Waiting for ExportHandler class...');
+        if (typeof marked === 'undefined') missingLibraries.push('marked');
+        if (typeof hljs === 'undefined') missingLibraries.push('highlight.js');
+        if (typeof katex === 'undefined') missingLibraries.push('KaTeX');
+        if (typeof JSZip === 'undefined') missingLibraries.push('JSZip');
+        if (typeof html2pdf === 'undefined') missingLibraries.push('html2pdf');
+        if (typeof ContentGenerator === 'undefined') missingLibraries.push('ContentGenerator');
+        if (typeof MarkdownConverter === 'undefined') missingLibraries.push('MarkdownConverter');
+        if (typeof ExportHandler === 'undefined') missingLibraries.push('ExportHandler');
+        
+        if (missingLibraries.length > 0) {
+            if (initAttempts === 1 || initAttempts % 10 === 0) {
+                console.log(`⏳ Waiting for libraries (attempt ${initAttempts}):`, missingLibraries.join(', '));
+            }
+            
+            if (initAttempts > MAX_ATTEMPTS) {
+                console.error('❌ Initialization timeout - failed to load:', missingLibraries.join(', '));
+                alert(`Failed to load: ${missingLibraries.join(', ')}.\n\nThis usually happens due to:\n1. Slow internet connection\n2. Ad blocker blocking CDN resources\n3. Browser extensions interfering\n\nPlease disable ad blockers for this site and refresh.`);
+                return;
+            }
+            
             setTimeout(initializeApp, 100);
             return;
         }
@@ -99,8 +76,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    // Start initialization with a small delay to ensure scripts are parsed
-    setTimeout(initializeApp, 50);
+    // Start initialization immediately
+    initializeApp();
 });
 
 /**
