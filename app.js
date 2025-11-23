@@ -12,26 +12,78 @@ let exportHandler;
  * Initialize the application
  */
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Converto initialized');
+    console.log('Converto - DOM Ready');
     
-    // Initialize modules after DOM is ready
-    try {
-        contentGen = new ContentGenerator();
-        console.log('ContentGenerator initialized');
+    // Wait for all external libraries to load
+    const initializeApp = () => {
+        // Check if all required libraries are loaded
+        if (typeof marked === 'undefined') {
+            console.log('Waiting for marked library...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof hljs === 'undefined') {
+            console.log('Waiting for highlight.js library...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof katex === 'undefined') {
+            console.log('Waiting for KaTeX library...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof JSZip === 'undefined') {
+            console.log('Waiting for JSZip library...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof html2pdf === 'undefined') {
+            console.log('Waiting for html2pdf library...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+        if (typeof saveAs === 'undefined') {
+            console.log('Waiting for FileSaver library...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
         
-        markdownConv = new MarkdownConverter();
-        console.log('MarkdownConverter initialized');
+        console.log('All libraries loaded, initializing modules...');
         
-        exportHandler = new ExportHandler();
-        console.log('ExportHandler initialized');
-        
-        console.log('All modules initialized successfully');
-    } catch (error) {
-        console.error('Error initializing modules:', error);
-        alert('Error loading application. Please refresh the page.');
-        return;
-    }
+        // Initialize modules after all dependencies are ready
+        try {
+            contentGen = new ContentGenerator();
+            console.log('✓ ContentGenerator initialized');
+            
+            markdownConv = new MarkdownConverter();
+            console.log('✓ MarkdownConverter initialized');
+            
+            exportHandler = new ExportHandler();
+            console.log('✓ ExportHandler initialized');
+            
+            console.log('✅ All modules initialized successfully');
+            
+            // Set up event listeners after successful initialization
+            setupEventListeners();
+            
+            // Show welcome message on startup
+            showWelcomeMessage();
+            
+        } catch (error) {
+            console.error('❌ Error initializing modules:', error);
+            alert('Error loading application: ' + error.message + '. Please refresh the page.');
+            return;
+        }
+    };
     
+    // Start initialization
+    initializeApp();
+});
+
+/**
+ * Setup all event listeners
+ */
+function setupEventListeners() {
     // Set up auto-preview on input
     const input = document.getElementById('markdownInput');
     if (input) {
@@ -39,15 +91,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Set up paste event listener for images in textarea
-    input.addEventListener('paste', handlePasteImage);
+    if (input) {
+        input.addEventListener('paste', handlePasteImage);
+    }
     
     // Set up paste event listener for images in preview (when edit mode is on)
     const preview = document.getElementById('preview');
-    preview.addEventListener('paste', handlePasteInPreview);
-
-    // Show welcome message on startup
-    showWelcomeMessage();
-});
+    if (preview) {
+        preview.addEventListener('paste', handlePasteInPreview);
+    }
+}
 
 /**
  * Show welcome message
