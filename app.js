@@ -15,9 +15,22 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Converto initialized');
     
     // Initialize modules after DOM is ready
-    contentGen = new ContentGenerator();
-    markdownConv = new MarkdownConverter();
-    exportHandler = new ExportHandler();
+    try {
+        contentGen = new ContentGenerator();
+        console.log('ContentGenerator initialized');
+        
+        markdownConv = new MarkdownConverter();
+        console.log('MarkdownConverter initialized');
+        
+        exportHandler = new ExportHandler();
+        console.log('ExportHandler initialized');
+        
+        console.log('All modules initialized successfully');
+    } catch (error) {
+        console.error('Error initializing modules:', error);
+        alert('Error loading application. Please refresh the page.');
+        return;
+    }
     
     // Set up auto-preview on input
     const input = document.getElementById('markdownInput');
