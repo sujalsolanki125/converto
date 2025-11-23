@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Export Handler
  * Handles export to DOCX, HTML, and PDF formats with formatting preservation
  */
@@ -82,17 +82,14 @@ class ExportHandler {
                 author = '',
                 date = new Date().toLocaleDateString(),
                 includeTOC = false,
-                pageNumbers = true,
-                theme = 'color'  // Default to color theme (user can choose BW if needed)
+                pageNumbers = true
             } = options;
-            
-            console.log('🎨 DOCX Export - Theme received:', theme, '| Options:', options);
 
             // Convert markdown to HTML
             const bodyHTML = this.converter.convert(content);
 
             // Create Office Open XML structure for DOCX
-            const docXml = this.createDocxXml(title, author, date, bodyHTML, theme);
+            const docXml = this.createDocxXml(title, author, date, bodyHTML);
             
             // Create DOCX using JSZip
             const zip = new JSZip();
@@ -104,7 +101,7 @@ class ExportHandler {
             zip.file('docProps/core.xml', this.getDocxCoreProps(title, author));
             zip.file('word/_rels/document.xml.rels', this.getDocxDocumentRels());
             zip.file('word/document.xml', docXml);
-            zip.file('word/styles.xml', this.getDocxStyles(theme));
+            zip.file('word/styles.xml', this.getDocxStyles());
             zip.file('word/fontTable.xml', this.getDocxFontTable());
             zip.file('word/settings.xml', this.getDocxSettings());
             
@@ -126,12 +123,9 @@ class ExportHandler {
     /**
      * Create main document.xml content
      */
-    createDocxXml(title, author, date, html, theme = 'color') {
+    createDocxXml(title, author, date, html) {
         // Convert HTML to Word XML format
-        const wordContent = this.htmlToWordXml(html, theme);
-        
-        // Theme-aware date color
-        const dateColor = theme === 'bw' ? '000000' : '808080';
+        const wordContent = this.htmlToWordXml(html);
         
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
@@ -150,7 +144,7 @@ class ExportHandler {
         </w:p>` : ''}
         <w:p>
             <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:sz w:val="20"/><w:color w:val="${dateColor}"/></w:rPr><w:t>${this.escapeXml(date)}</w:t></w:r>
+            <w:r><w:rPr><w:sz w:val="20"/><w:color w:val="808080"/></w:rPr><w:t>${this.escapeXml(date)}</w:t></w:r>
         </w:p>
         ${wordContent}
         <w:sectPr>
@@ -165,7 +159,7 @@ class ExportHandler {
     /**
      * Convert HTML to Word XML paragraphs
      */
-    htmlToWordXml(html, theme = 'color') {
+    htmlToWordXml(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         let wordXml = '';
@@ -183,47 +177,35 @@ class ExportHandler {
                 const tagName = node.tagName.toLowerCase();
                 
                 switch (tagName) {
-                    case 'h1': {
-                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${content}</w:p>`;
-                    }
-                    case 'h2': {
-                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${content}</w:p>`;
-                    }
-                    case 'h3': {
-                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${content}</w:p>`;
-                    }
-                    case 'h4': {
-                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
-                        return `<w:p><w:pPr><w:pStyle w:val="Heading4"/></w:pPr>${content}</w:p>`;
-                    }
-                    case 'p': {
-                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
-                        return `<w:p>${content}</w:p>`;
-                    }
+                    case 'h1':
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${this.processChildren(node)}</w:p>`;
+                    case 'h2':
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${this.processChildren(node)}</w:p>`;
+                    case 'h3':
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${this.processChildren(node)}</w:p>`;
+                    case 'h4':
+                        return `<w:p><w:pPr><w:pStyle w:val="Heading4"/></w:pPr>${this.processChildren(node)}</w:p>`;
+                    case 'p':
+                        return `<w:p>${this.processChildren(node)}</w:p>`;
                     case 'strong':
                     case 'b':
-                        return `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(node.textContent)}</w:t></w:r>`;
+                        return `<w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(node.textContent)}</w:t></w:r>`;
                     case 'em':
                     case 'i':
-                        return `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(node.textContent)}</w:t></w:r>`;
+                        return `<w:r><w:rPr><w:i/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(node.textContent)}</w:t></w:r>`;
                     case 'code':
                         if (node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre') {
                             return ''; // Handled by pre
                         }
-                        return `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(node.textContent)}</w:t></w:r>`;
+                        return `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/><w:color w:val="C7254E"/></w:rPr><w:t>${this.escapeXml(node.textContent)}</w:t></w:r>`;
                     case 'pre':
                         const codeText = node.textContent;
                         return `<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:color w:val="000000"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(codeText)}</w:t></w:r></w:p>`;
                     case 'ul':
                     case 'ol':
                         return this.processListItems(node, tagName === 'ol');
-                    case 'blockquote': {
-                        const content = this.processChildren(node) || '<w:r><w:t></w:t></w:r>';
-                        return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${content}</w:p>`;
-                    }
+                    case 'blockquote':
+                        return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${this.processChildren(node)}</w:p>`;
                     case 'table':
                         return this.processTable(node);
                     case 'br':
@@ -249,23 +231,20 @@ class ExportHandler {
         let result = '';
         Array.from(node.childNodes).forEach(child => {
             if (child.nodeType === Node.TEXT_NODE) {
-                const text = child.textContent;
+                const text = child.textContent.trim();
                 if (text) {
                     result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
                 }
             } else if (child.nodeType === Node.ELEMENT_NODE) {
                 const tagName = child.tagName.toLowerCase();
-                const text = child.textContent;
                 if (tagName === 'strong' || tagName === 'b') {
-                    result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
                 } else if (tagName === 'em' || tagName === 'i') {
-                    result += `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:i/><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
                 } else if (tagName === 'code') {
-                    result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
-                } else if (tagName === 'a') {
-                    result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/><w:color w:val="C7254E"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
                 } else {
-                    result += `<w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>${this.escapeXml(child.textContent)}</w:t></w:r>`;
                 }
             }
         });
@@ -279,8 +258,12 @@ class ExportHandler {
         let result = '';
         const items = listNode.querySelectorAll(':scope > li');
         items.forEach((li, index) => {
-            const text = li.textContent.trim() || '';
-            result += `<w:p><w:pPr><w:pStyle w:val="${isOrdered ? 'ListNumber' : 'ListBullet'}"/></w:pPr><w:r><w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r></w:p>`;
+            result += `<w:p>
+                <w:pPr>
+                    <w:pStyle w:val="${isOrdered ? 'ListNumber' : 'ListBullet'}"/>
+                </w:pPr>
+                <w:r><w:t>${this.escapeXml(li.textContent)}</w:t></w:r>
+            </w:p>`;
         });
         return result;
     }
@@ -297,16 +280,10 @@ class ExportHandler {
             const cells = row.querySelectorAll('th, td');
             cells.forEach(cell => {
                 const isHeader = cell.tagName.toLowerCase() === 'th';
-                const text = cell.textContent.trim() || '';
-                result += '<w:tc><w:tcPr>';
-                if (isHeader) {
-                    result += '<w:shd w:fill="F0F0F0"/>';
-                }
-                result += '</w:tcPr><w:p><w:r>';
-                if (isHeader) {
-                    result += '<w:rPr><w:b/></w:rPr>';
-                }
-                result += `<w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
+                result += `<w:tc>
+                    <w:tcPr>${isHeader ? '<w:shd w:fill="D9E2F3"/>' : ''}</w:tcPr>
+                    <w:p><w:r>${isHeader ? '<w:rPr><w:b/><w:color w:val="000000"/></w:rPr>' : '<w:rPr><w:color w:val="000000"/></w:rPr>'}<w:t>${this.escapeXml(cell.textContent)}</w:t></w:r></w:p>
+                </w:tc>`;
             });
             result += '</w:tr>';
         });
@@ -387,32 +364,7 @@ class ExportHandler {
     /**
      * Get DOCX styles
      */
-    getDocxStyles(theme = 'color') {
-        // Theme-specific colors
-        const colors = theme === 'bw' ? {
-            title: '000000',
-            subtitle: '000000',
-            heading1: '000000',
-            heading2: '000000',
-            heading3: '000000',
-            heading4: '000000',
-            normal: '000000',
-            quote: '404040',
-            codeBg: 'F5F5F5',
-            codeText: '000000'
-        } : {
-            title: '2E74B5',
-            subtitle: '595959',
-            heading1: '2E74B5',
-            heading2: '2E74B5',
-            heading3: '1F4D78',
-            heading4: '2E74B5',
-            normal: '000000',
-            quote: '595959',
-            codeBg: 'F2F2F2',
-            codeText: '000000'
-        };
-        
+    getDocxStyles() {
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -475,7 +427,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="56"/>
-            <w:color w:val="${colors.title}"/>
+            <w:color w:val="2E74B5"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Subtitle">
@@ -489,7 +441,7 @@ class ExportHandler {
         <w:rPr>
             <w:i/>
             <w:sz w:val="28"/>
-            <w:color w:val="${colors.subtitle}"/>
+            <w:color w:val="595959"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading1">
@@ -504,7 +456,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="36"/>
-            <w:color w:val="${colors.heading1}"/>
+            <w:color w:val="2E74B5"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading2">
@@ -519,7 +471,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="28"/>
-            <w:color w:val="${colors.heading2}"/>
+            <w:color w:val="2E74B5"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading3">
@@ -534,7 +486,7 @@ class ExportHandler {
         <w:rPr>
             <w:b/>
             <w:sz w:val="24"/>
-            <w:color w:val="${colors.heading3}"/>
+            <w:color w:val="1F4D78"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Heading4">
@@ -550,7 +502,7 @@ class ExportHandler {
             <w:b/>
             <w:i/>
             <w:sz w:val="22"/>
-            <w:color w:val="${colors.heading4}"/>
+            <w:color w:val="2E74B5"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="CodeBlock">
@@ -558,12 +510,12 @@ class ExportHandler {
         <w:basedOn w:val="Normal"/>
         <w:pPr>
             <w:spacing w:before="200" w:after="200"/>
-            <w:shd w:fill="${colors.codeBg}"/>
+            <w:shd w:fill="F2F2F2"/>
         </w:pPr>
         <w:rPr>
             <w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>
             <w:sz w:val="20"/>
-            <w:color w:val="${colors.codeText}"/>
+            <w:color w:val="000000"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="Quote">
@@ -575,7 +527,7 @@ class ExportHandler {
         </w:pPr>
         <w:rPr>
             <w:i/>
-            <w:color w:val="${colors.quote}"/>
+            <w:color w:val="595959"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="ListBullet">

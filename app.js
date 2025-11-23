@@ -328,6 +328,7 @@ async function exportToDOCX() {
     try {
         // Get theme selection
         const theme = document.querySelector('input[name="exportTheme"]:checked').value;
+        console.log('📄 Exporting DOCX with theme:', theme);
         
         const options = {
             title: 'Document',

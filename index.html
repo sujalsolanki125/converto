@@ -179,17 +179,22 @@ Click 'Load Sample' to see an example."></textarea>
             </div>
             
             <div class="export-options" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                <label style="font-weight: 600; color: #66e4ff; margin-bottom: 8px; display: block;">
-                    🎨 Export Theme:
+                <label style="font-weight: 600; color: #66e4ff; margin-bottom: 10px; display: block; font-size: 14px;">
+                    🎨 Export Theme (Choose before exporting):
                 </label>
-                <label style="margin-right: 20px;">
-                    <input type="radio" name="exportTheme" id="themeColor" value="color" checked> 
-                    Color (Dark Theme)
-                </label>
-                <label>
-                    <input type="radio" name="exportTheme" id="themeBW" value="bw"> 
-                    Black & White (Print-Friendly)
-                </label>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; cursor: pointer; padding: 8px 15px; background: rgba(102, 228, 255, 0.1); border-radius: 8px; border: 2px solid transparent; transition: all 0.3s;" onmouseover="this.style.borderColor='#66e4ff'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='transparent'">
+                        <input type="radio" name="exportTheme" id="themeColor" value="color" checked style="margin-right: 8px;" onchange="document.querySelectorAll('label').forEach(l => {if(l.querySelector('input[name=exportTheme]')) l.style.borderColor = l.querySelector('input').checked ? '#66e4ff' : 'transparent'})"> 
+                        <span style="font-weight: 500;">🌈 Color (Dark Theme)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer; padding: 8px 15px; background: rgba(217, 70, 239, 0.1); border-radius: 8px; border: 2px solid transparent; transition: all 0.3s;" onmouseover="this.style.borderColor='#d946ef'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='transparent'">
+                        <input type="radio" name="exportTheme" id="themeBW" value="bw" style="margin-right: 8px;" onchange="document.querySelectorAll('label').forEach(l => {if(l.querySelector('input[name=exportTheme]')) l.style.borderColor = l.querySelector('input').checked ? '#d946ef' : 'transparent'})"> 
+                        <span style="font-weight: 500;">⚫ Black & White (Print-Friendly)</span>
+                    </label>
+                </div>
+                <p style="margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.5); font-style: italic;">
+                    💡 Select your preferred theme, then click any export button above
+                </p>
             </div>
         </section>
 
@@ -285,5 +290,16 @@ Click 'Load Sample' to see an example."></textarea>
     <script src="markdown-converter.js"></script>
     <script src="export-handler.js"></script>
     <script src="app.js"></script>
+    
+    <!-- Initialize theme selection UI -->
+    <script>
+        // Set initial border color for checked radio button
+        document.addEventListener('DOMContentLoaded', function() {
+            const colorLabel = document.querySelector('label:has(#themeColor)');
+            if (colorLabel && document.getElementById('themeColor').checked) {
+                colorLabel.style.borderColor = '#66e4ff';
+            }
+        });
+    </script>
 </body>
 </html>
