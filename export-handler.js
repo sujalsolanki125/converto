@@ -56,7 +56,8 @@ class ExportHandler {
                 includeTOC = false,
                 title = 'Document',
                 author = '',
-                date = new Date().toLocaleDateString()
+                date = new Date().toLocaleDateString(),
+                theme = 'bw'
             } = options;
 
             // Convert markdown to HTML
@@ -70,7 +71,7 @@ class ExportHandler {
             html += `  <title>${title}</title>\n`;
 
             if (includeStyles) {
-                html += this.getEmbeddedStyles();
+                html += this.getEmbeddedStyles(theme);
             }
 
             html += '</head>\n<body>\n';
@@ -1638,8 +1639,8 @@ class ExportHandler {
         const codeBlocks = container.querySelectorAll('pre');
         codeBlocks.forEach(pre => {
             pre.style.cssText = `
-                background: #1e293b !important; 
-                color: #e2e8f0 !important; 
+                background: ${codeBg} !important; 
+                color: ${codeColor} !important; 
                 padding: 15px; 
                 border-radius: 5px; 
                 margin: 10px 0; 
@@ -1648,33 +1649,61 @@ class ExportHandler {
                 white-space: pre-wrap; 
                 overflow-x: hidden; 
                 page-break-inside: avoid;
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid ${codeBorder};
             `;
-            // Reset inner code styles so they inherit the white text
+            // Reset inner code styles so they inherit parent text color
             const code = pre.querySelector('code');
             if (code) code.style.cssText = 'background: transparent !important; color: inherit !important; padding: 0;';
         });
 
+        // Inline Code
+        const inlineCodes = container.querySelectorAll('code:not(pre code)');
+        const inlineCodeBg = isColor ? 'rgba(255, 255, 255, 0.1)' : '#f2f2f2';
+        const inlineCodeColor = isColor ? '#e2e8f0' : '#c7254e';
+        const inlineCodeBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd';
+        
+        inlineCodes.forEach(code => {
+            code.style.cssText = `
+                background: ${inlineCodeBg};
+                color: ${inlineCodeColor};
+                padding: 2px 6px;
+                border-radius: 3px;
+                border: 1px solid ${inlineCodeBorder};
+                font-family: 'Consolas', monospace;
+                font-size: 9pt;
+            `;
+        });
+
         // Table Styling
+        const tableBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#bfbfbf';
+        const tableBg = isColor ? 'rgba(255, 255, 255, 0.02)' : '#ffffff';
+        const thBg = isColor ? 'rgba(102, 228, 255, 0.1)' : '#e0e0e0';
+        const thColor = isColor ? '#66e4ff' : '#000000';
+        const tdColor = isColor ? '#e2e8f0' : '#000000';
+        
         const tables = container.querySelectorAll('table');
         tables.forEach(table => {
-            table.style.cssText = 'width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; font-size: 10pt; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.02);';
+            table.style.cssText = `width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; font-size: 10pt; border: 1px solid ${tableBorder}; background: ${tableBg};`;
             
             const ths = table.querySelectorAll('th');
             ths.forEach(th => {
-                th.style.cssText = 'background: rgba(102, 228, 255, 0.1); color: #66e4ff; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: left; font-weight: bold;';
+                th.style.cssText = `background: ${thBg}; color: ${thColor}; padding: 8px; border: 1px solid ${tableBorder}; text-align: left; font-weight: bold;`;
             });
             
             const tds = table.querySelectorAll('td');
             tds.forEach(td => {
-                td.style.cssText = 'padding: 8px; border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0;';
+                td.style.cssText = `padding: 8px; border: 1px solid ${tableBorder}; color: ${tdColor};`;
             });
         });
 
         // Style Blockquotes
+        const bqBorder = isColor ? '#d946ef' : '#666666';
+        const bqColor = isColor ? '#94a3b8' : '#404040';
+        const bqBg = isColor ? 'rgba(255, 255, 255, 0.02)' : '#f9f9f9';
+        
         const blockquotes = container.querySelectorAll('blockquote');
         blockquotes.forEach(bq => {
-            bq.style.cssText = 'border-left: 4px solid #d946ef; padding-left: 15px; margin: 10px 0; color: #94a3b8; font-style: italic; background: rgba(255, 255, 255, 0.02); padding: 10px; border-radius: 0 4px 4px 0;';
+            bq.style.cssText = `border-left: 4px solid ${bqBorder}; padding-left: 15px; margin: 10px 0; color: ${bqColor}; font-style: italic; background: ${bqBg}; padding: 10px; border-radius: 0 4px 4px 0;`;
         });
         
         // Images
@@ -1685,10 +1714,39 @@ class ExportHandler {
         });
         
         // Links
+        const linkColor = isColor ? '#66e4ff' : '#2E74B5';
         const links = container.querySelectorAll('a');
         links.forEach(a => {
-            a.style.color = '#66e4ff';
+            a.style.color = linkColor;
             a.style.textDecoration = 'none';
+        });
+
+        // Lists
+        const lists = container.querySelectorAll('ul, ol');
+        lists.forEach(list => {
+            list.style.color = isColor ? '#e2e8f0' : '#000000';
+        });
+
+        // Paragraphs
+        const paragraphs = container.querySelectorAll('p');
+        paragraphs.forEach(p => {
+            p.style.color = isColor ? '#ffffff' : '#000000';
+        });
+
+        // Strong/Bold
+        const strongs = container.querySelectorAll('strong, b');
+        const strongColor = isColor ? '#66e4ff' : '#000000';
+        strongs.forEach(s => {
+            s.style.color = strongColor;
+            s.style.fontWeight = 'bold';
+        });
+
+        // Emphasis/Italic
+        const ems = container.querySelectorAll('em, i');
+        const emColor = isColor ? '#d946ef' : '#000000';
+        ems.forEach(em => {
+            em.style.color = emColor;
+            em.style.fontStyle = 'italic';
         });
     }
 
@@ -1750,10 +1808,49 @@ class ExportHandler {
     /**
      * Get embedded CSS styles for HTML export
      */
-    getEmbeddedStyles() {
+    getEmbeddedStyles(theme = 'bw') {
+        const isColor = theme === 'color';
+        
+        // Theme-specific colors
+        const bgColor = isColor ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : '#ffffff';
+        const textColor = isColor ? '#ffffff' : '#000000';
+        const titleColor = isColor ? '#66e4ff' : '#2E74B5';
+        const authorColor = isColor ? '#94a3b8' : '#666666';
+        const dateColor = isColor ? '#64748b' : '#999999';
+        const borderColor = isColor ? '#66e4ff' : '#cccccc';
+        const contentBg = isColor ? 'rgba(255, 255, 255, 0.05)' : '#f9f9f9';
+        const contentBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0';
+        const footerColor = isColor ? '#64748b' : '#999999';
+        const codeBg = isColor ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5';
+        const codeColor = isColor ? '#e2e8f0' : '#c7254e';
+        const preBg = isColor ? '#1e293b' : '#f5f5f5';
+        const preBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd';
+        const preCodeColor = isColor ? '#abb2bf' : '#000000';
+        const tableBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd';
+        const thBg = isColor ? 'rgba(102, 228, 255, 0.1)' : '#e0e0e0';
+        const thColor = isColor ? '#66e4ff' : '#000000';
+        const trEvenBg = isColor ? 'rgba(255, 255, 255, 0.05)' : '#f9f9f9';
+        const tdColor = isColor ? '#e2e8f0' : '#000000';
+        const bqBorder = isColor ? '#d946ef' : '#666666';
+        const bqColor = isColor ? '#94a3b8' : '#666666';
+        const bqBg = isColor ? 'rgba(255, 255, 255, 0.02)' : '#f9f9f9';
+        const linkColor = isColor ? '#66e4ff' : '#2E74B5';
+        const highlightBg = isColor ? 'rgba(251, 191, 36, 0.2)' : '#ffeb3b';
+        const highlightColor = isColor ? '#fbbf24' : '#000000';
+        
+        const highlightStyle = isColor ? `
+        .highlight-yellow { background-color: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 2px 4px; }
+        .highlight-green { background-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 4px; }
+        .highlight-blue { background-color: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 4px; }
+        .highlight-pink { background-color: rgba(236, 72, 153, 0.2); color: #f472b6; padding: 2px 4px; }` : `
+        .highlight-yellow { background-color: #ffeb3b; color: #000000; padding: 2px 4px; font-weight: bold; }
+        .highlight-green { background-color: #a5d6a7; color: #000000; padding: 2px 4px; font-weight: bold; }
+        .highlight-blue { background-color: #90caf9; color: #000000; padding: 2px 4px; font-weight: bold; }
+        .highlight-pink { background-color: #f48fb1; color: #000000; padding: 2px 4px; font-weight: bold; }`;
+        
         return `
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${isColor ? 'atom-one-dark' : 'github'}.min.css">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1761,100 +1858,122 @@ class ExportHandler {
             max-width: 900px;
             margin: 40px auto;
             padding: 20px;
-            color: #ffffff;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: ${textColor};
+            background: ${bgColor};
         }
         .document-header {
             text-align: center;
             margin-bottom: 40px;
             padding-bottom: 20px;
-            border-bottom: 3px solid #66e4ff;
+            border-bottom: 3px solid ${borderColor};
         }
         .document-title {
-            color: #66e4ff;
+            color: ${titleColor};
             font-size: 2.5em;
             margin-bottom: 10px;
         }
         .document-author {
             font-style: italic;
-            color: #94a3b8;
+            color: ${authorColor};
         }
         .document-date {
-            color: #64748b;
+            color: ${dateColor};
         }
         .document-content {
-            background: rgba(255, 255, 255, 0.05);
+            background: ${contentBg};
             padding: 40px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px ${isColor ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'};
+            border: 1px solid ${contentBorder};
         }
         .document-footer {
             text-align: center;
             margin-top: 40px;
-            color: #64748b;
+            color: ${footerColor};
             font-size: 0.9em;
         }
+        h1, h2, h3, h4, h5, h6 {
+            color: ${isColor ? titleColor : '#2E74B5'};
+        }
         code {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: ${codeBg};
             padding: 2px 6px;
             border-radius: 3px;
             font-family: 'Consolas', 'Monaco', monospace;
             font-size: 0.9em;
-            color: #e2e8f0;
+            color: ${codeColor};
+            border: 1px solid ${isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd'};
         }
         pre {
-            background-color: #1e293b;
+            background-color: ${preBg};
             padding: 16px;
             border-radius: 6px;
             overflow-x: auto;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid ${preBorder};
         }
         pre code {
             background: none;
             padding: 0;
-            color: #abb2bf;
+            color: ${preCodeColor};
+            border: none;
         }
         table {
             border-collapse: collapse;
             width: 100%;
             margin: 20px 0;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid ${tableBorder};
         }
         th, td {
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid ${tableBorder};
             padding: 12px;
             text-align: left;
         }
         th {
-            background-color: rgba(102, 228, 255, 0.1);
-            color: #66e4ff;
+            background-color: ${thBg};
+            color: ${thColor};
             font-weight: 600;
         }
         tr:nth-child(even) {
-            background-color: rgba(255, 255, 255, 0.05);
+            background-color: ${trEvenBg};
         }
         td {
-            color: #e2e8f0;
+            color: ${tdColor};
         }
         .katex-display {
             margin: 1.5em 0;
         }
-        .highlight-yellow { background-color: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 2px 4px; }
-        .highlight-green { background-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 4px; }
-        .highlight-blue { background-color: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 4px; }
-        .highlight-pink { background-color: rgba(236, 72, 153, 0.2); color: #f472b6; padding: 2px 4px; }
+        ${highlightStyle}
         blockquote {
-            border-left: 4px solid #d946ef;
+            border-left: 4px solid ${bqBorder};
             padding-left: 15px;
             margin: 10px 0;
-            color: #94a3b8;
+            color: ${bqColor};
             font-style: italic;
-            background: rgba(255, 255, 255, 0.02);
+            background: ${bqBg};
             padding: 10px;
             border-radius: 0 4px 4px 0;
         }
-        a { color: #66e4ff; text-decoration: none; }
+        a { 
+            color: ${linkColor}; 
+            text-decoration: none; 
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        strong {
+            color: ${isColor ? '#ffffff' : '#000000'};
+            font-weight: bold;
+        }
+        em {
+            color: ${isColor ? '#e2e8f0' : '#333333'};
+            font-style: italic;
+        }
+        p {
+            color: ${textColor};
+        }
+        ul, ol {
+            color: ${textColor};
+        }
     </style>`;
     }
 
