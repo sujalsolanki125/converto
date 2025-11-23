@@ -83,7 +83,7 @@ class ExportHandler {
                 date = new Date().toLocaleDateString(),
                 includeTOC = false,
                 pageNumbers = true,
-                theme = 'color'
+                theme = 'bw'  // Default to black & white for maximum compatibility
             } = options;
 
             // Convert markdown to HTML
@@ -124,9 +124,12 @@ class ExportHandler {
     /**
      * Create main document.xml content
      */
-    createDocxXml(title, author, date, html, theme = 'color') {
+    createDocxXml(title, author, date, html, theme = 'bw') {
         // Convert HTML to Word XML format
         const wordContent = this.htmlToWordXml(html, theme);
+        
+        // Theme-aware date color
+        const dateColor = theme === 'bw' ? '000000' : '808080';
         
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
@@ -145,7 +148,7 @@ class ExportHandler {
         </w:p>` : ''}
         <w:p>
             <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:sz w:val="20"/><w:color w:val="808080"/></w:rPr><w:t>${this.escapeXml(date)}</w:t></w:r>
+            <w:r><w:rPr><w:sz w:val="20"/><w:color w:val="${dateColor}"/></w:rPr><w:t>${this.escapeXml(date)}</w:t></w:r>
         </w:p>
         ${wordContent}
         <w:sectPr>
@@ -160,7 +163,7 @@ class ExportHandler {
     /**
      * Convert HTML to Word XML paragraphs
      */
-    htmlToWordXml(html, theme = 'color') {
+    htmlToWordXml(html, theme = 'bw') {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         let wordXml = '';
@@ -292,10 +295,16 @@ class ExportHandler {
             const cells = row.querySelectorAll('th, td');
             cells.forEach(cell => {
                 const isHeader = cell.tagName.toLowerCase() === 'th';
-                result += `<w:tc>
-                    <w:tcPr>${isHeader ? '<w:shd w:fill="D9E2F3"/>' : ''}</w:tcPr>
-                    <w:p><w:r>${isHeader ? '<w:rPr><w:b/><w:color w:val="000000"/></w:rPr>' : '<w:rPr><w:color w:val="000000"/></w:rPr>'}<w:t>${this.escapeXml(cell.textContent)}</w:t></w:r></w:p>
-                </w:tc>`;
+                const text = cell.textContent.trim() || '';
+                result += '<w:tc><w:tcPr>';
+                if (isHeader) {
+                    result += '<w:shd w:fill="F0F0F0"/>';
+                }
+                result += '</w:tcPr><w:p><w:r>';
+                if (isHeader) {
+                    result += '<w:rPr><w:b/></w:rPr>';
+                }
+                result += `<w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
             });
             result += '</w:tr>';
         });
@@ -376,7 +385,7 @@ class ExportHandler {
     /**
      * Get DOCX styles
      */
-    getDocxStyles(theme = 'color') {
+    getDocxStyles(theme = 'bw') {
         // Theme-specific colors
         const colors = theme === 'bw' ? {
             title: '000000',
