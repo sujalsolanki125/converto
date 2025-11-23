@@ -1,49 +1,11 @@
 /**
  * Export Handler
- * Handles export to DOCX, HTML, and PDF formats with theme support
- * Supports both "color" and "bw" (black & white) themes
+ * Handles export to DOCX, HTML, and PDF formats with formatting preservation
  */
 
 class ExportHandler {
     constructor() {
         this.converter = new MarkdownConverter();
-    }
-
-    /**
-     * Unified export API
-     * @param {Object} options - Export options
-     * @param {string} options.format - Export format: "pdf" | "docx" | "html"
-     * @param {string} options.theme - Theme: "color" | "bw"
-     * @param {string} options.content - Markdown content
-     * @param {string} options.fileName - Optional file name
-     * @param {string} options.title - Document title
-     * @param {string} options.author - Document author
-     */
-    async exportDocument(options) {
-        const {
-            format = 'pdf',
-            theme = 'color',
-            content = '',
-            fileName = 'document',
-            title = 'Document',
-            author = ''
-        } = options;
-
-        try {
-            switch (format.toLowerCase()) {
-                case 'pdf':
-                    return await this.exportToPDF(content, { theme, title, author, fileName });
-                case 'docx':
-                    return await this.exportToDOCX(content, { theme, title, author, fileName });
-                case 'html':
-                    return await this.exportToHTML(content, { theme, title, author, fileName });
-                default:
-                    throw new Error(`Unsupported format: ${format}`);
-            }
-        } catch (error) {
-            console.error('Export error:', error);
-            return { success: false, error: error.message };
-        }
     }
 
     /**
@@ -56,8 +18,7 @@ class ExportHandler {
                 includeTOC = false,
                 title = 'Document',
                 author = '',
-                date = new Date().toLocaleDateString(),
-                theme = 'bw'
+                date = new Date().toLocaleDateString()
             } = options;
 
             // Convert markdown to HTML
@@ -71,7 +32,7 @@ class ExportHandler {
             html += `  <title>${title}</title>\n`;
 
             if (includeStyles) {
-                html += this.getEmbeddedStyles(theme);
+                html += this.getEmbeddedStyles();
             }
 
             html += '</head>\n<body>\n';
@@ -120,15 +81,15 @@ class ExportHandler {
                 title = 'Document',
                 author = '',
                 date = new Date().toLocaleDateString(),
-                theme = 'bw',
-                fileName = 'document'
+                includeTOC = false,
+                pageNumbers = true
             } = options;
 
             // Convert markdown to HTML
             const bodyHTML = this.converter.convert(content);
 
             // Create Office Open XML structure for DOCX
-            const docXml = this.createDocxXml(title, author, date, bodyHTML, theme);
+            const docXml = this.createDocxXml(title, author, date, bodyHTML);
             
             // Create DOCX using JSZip
             const zip = new JSZip();
@@ -140,7 +101,7 @@ class ExportHandler {
             zip.file('docProps/core.xml', this.getDocxCoreProps(title, author));
             zip.file('word/_rels/document.xml.rels', this.getDocxDocumentRels());
             zip.file('word/document.xml', docXml);
-            zip.file('word/styles.xml', this.getDocxStyles(theme));
+            zip.file('word/styles.xml', this.getDocxStyles());
             zip.file('word/fontTable.xml', this.getDocxFontTable());
             zip.file('word/settings.xml', this.getDocxSettings());
             
@@ -150,9 +111,7 @@ class ExportHandler {
                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 compression: 'DEFLATE'
             });
-            
-            const finalFileName = `${this.sanitizeFilename(fileName || title)}.docx`;
-            saveAs(blob, finalFileName);
+            saveAs(blob, `${this.sanitizeFilename(title)}.docx`);
 
             return { success: true, message: 'DOCX exported successfully' };
         } catch (error) {
@@ -164,9 +123,9 @@ class ExportHandler {
     /**
      * Create main document.xml content
      */
-    createDocxXml(title, author, date, html, theme = 'bw') {
+    createDocxXml(title, author, date, html) {
         // Convert HTML to Word XML format
-        const wordContent = this.htmlToWordXml(html, theme);
+        const wordContent = this.htmlToWordXml(html);
         
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
@@ -200,7 +159,7 @@ class ExportHandler {
     /**
      * Convert HTML to Word XML paragraphs
      */
-    htmlToWordXml(html, theme = 'bw') {
+    htmlToWordXml(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         let wordXml = '';
@@ -248,7 +207,7 @@ class ExportHandler {
                     case 'blockquote':
                         return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${this.processChildren(node)}</w:p>`;
                     case 'table':
-                        return this.processTable(node, theme);
+                        return this.processTable(node);
                     case 'br':
                         return '<w:r><w:br/></w:r>';
                     default:
@@ -312,8 +271,7 @@ class ExportHandler {
     /**
      * Process table
      */
-    processTable(tableNode, theme = 'bw') {
-        const headerFill = theme === 'color' ? 'D9E2F3' : 'E0E0E0';
+    processTable(tableNode) {
         let result = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/></w:tblPr>';
         
         const rows = tableNode.querySelectorAll('tr');
@@ -323,7 +281,7 @@ class ExportHandler {
             cells.forEach(cell => {
                 const isHeader = cell.tagName.toLowerCase() === 'th';
                 result += `<w:tc>
-                    <w:tcPr>${isHeader ? `<w:shd w:fill="${headerFill}"/>` : ''}</w:tcPr>
+                    <w:tcPr>${isHeader ? '<w:shd w:fill="D9E2F3"/>' : ''}</w:tcPr>
                     <w:p><w:r>${isHeader ? '<w:rPr><w:b/><w:color w:val="000000"/></w:rPr>' : '<w:rPr><w:color w:val="000000"/></w:rPr>'}<w:t>${this.escapeXml(cell.textContent)}</w:t></w:r></w:p>
                 </w:tc>`;
             });
@@ -404,296 +362,9 @@ class ExportHandler {
     }
 
     /**
-     * Get DOCX styles based on theme
-     * @param {string} theme - "color" or "bw"
+     * Get DOCX styles
      */
-    getDocxStyles(theme = 'bw') {
-        const isColor = theme === 'color';
-        
-        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
-          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-    <w:docDefaults>
-        <w:rPrDefault>
-            <w:rPr>
-                <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Times New Roman"/>
-                <w:sz w:val="22"/>
-                <w:szCs w:val="22"/>
-                <w:lang w:val="en-US" w:eastAsia="en-US" w:bidi="ar-SA"/>
-            </w:rPr>
-        </w:rPrDefault>
-        <w:pPrDefault>
-            <w:pPr>
-                <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
-            </w:pPr>
-        </w:pPrDefault>
-    </w:docDefaults>
-    <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
-        <w:name w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
-        </w:pPr>
-        <w:rPr>
-            <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
-            <w:sz w:val="22"/>
-            <w:color w:val="000000"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont">
-        <w:name w:val="Default Paragraph Font"/>
-        <w:uiPriority w:val="1"/>
-        <w:semiHidden/>
-        <w:unhideWhenUsed/>
-    </w:style>
-    <w:style w:type="table" w:default="1" w:styleId="TableNormal">
-        <w:name w:val="Normal Table"/>
-        <w:uiPriority w:val="99"/>
-        <w:semiHidden/>
-        <w:unhideWhenUsed/>
-        <w:tblPr>
-            <w:tblInd w:w="0" w:type="dxa"/>
-            <w:tblCellMar>
-                <w:top w:w="0" w:type="dxa"/>
-                <w:left w:w="108" w:type="dxa"/>
-                <w:bottom w:w="0" w:type="dxa"/>
-                <w:right w:w="108" w:type="dxa"/>
-            </w:tblCellMar>
-        </w:tblPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Title">
-        <w:name w:val="Title"/>
-        <w:basedOn w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:spacing w:before="240" w:after="200"/>
-            <w:jc w:val="center"/>
-        </w:pPr>
-        <w:rPr>
-            <w:b/>
-            <w:sz w:val="56"/>
-            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Subtitle">
-        <w:name w:val="Subtitle"/>
-        <w:basedOn w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:spacing w:after="120"/>
-            <w:jc w:val="center"/>
-        </w:pPr>
-        <w:rPr>
-            <w:i/>
-            <w:sz w:val="28"/>
-            <w:color w:val="${isColor ? '595959' : '404040'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Heading1">
-        <w:name w:val="Heading 1"/>
-        <w:basedOn w:val="Normal"/>
-        <w:next w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:keepNext/>
-            <w:spacing w:before="480" w:after="240"/>
-        </w:pPr>
-        <w:rPr>
-            <w:b/>
-            <w:sz w:val="36"/>
-            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Heading2">
-        <w:name w:val="Heading 2"/>
-        <w:basedOn w:val="Normal"/>
-        <w:next w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:keepNext/>
-            <w:spacing w:before="320" w:after="160"/>
-        </w:pPr>
-        <w:rPr>
-            <w:b/>
-            <w:sz w:val="28"/>
-            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Heading3">
-        <w:name w:val="Heading 3"/>
-        <w:basedOn w:val="Normal"/>
-        <w:next w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:keepNext/>
-            <w:spacing w:before="240" w:after="120"/>
-        </w:pPr>
-        <w:rPr>
-            <w:b/>
-            <w:sz w:val="24"/>
-            <w:color w:val="${isColor ? '1F4D78' : '000000'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Heading4">
-        <w:name w:val="Heading 4"/>
-        <w:basedOn w:val="Normal"/>
-        <w:next w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:keepNext/>
-            <w:spacing w:before="160" w:after="80"/>
-        </w:pPr>
-        <w:rPr>
-            <w:b/>
-            <w:i/>
-            <w:sz w:val="22"/>
-            <w:color w:val="${isColor ? '2E74B5' : '000000'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="CodeBlock">
-        <w:name w:val="Code Block"/>
-        <w:basedOn w:val="Normal"/>
-        <w:pPr>
-            <w:spacing w:before="200" w:after="200"/>
-            <w:shd w:fill="${isColor ? 'F2F2F2' : 'F5F5F5'}"/>
-        </w:pPr>
-        <w:rPr>
-            <w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>
-            <w:sz w:val="20"/>
-            <w:color w:val="000000"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="Quote">
-        <w:name w:val="Quote"/>
-        <w:basedOn w:val="Normal"/>
-        <w:pPr>
-            <w:ind w:left="720"/>
-            <w:spacing w:before="200" w:after="200"/>
-        </w:pPr>
-        <w:rPr>
-            <w:i/>
-            <w:color w:val="${isColor ? '595959' : '404040'}"/>
-        </w:rPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="ListBullet">
-        <w:name w:val="List Bullet"/>
-        <w:basedOn w:val="Normal"/>
-        <w:pPr>
-            <w:ind w:left="720"/>
-        </w:pPr>
-    </w:style>
-    <w:style w:type="paragraph" w:styleId="ListNumber">
-        <w:name w:val="List Number"/>
-        <w:basedOn w:val="Normal"/>
-        <w:pPr>
-            <w:ind w:left="720"/>
-        </w:pPr>
-    </w:style>
-    <w:style w:type="table" w:styleId="TableGrid">
-        <w:name w:val="Table Grid"/>
-        <w:basedOn w:val="TableNormal"/>
-        <w:uiPriority w:val="39"/>
-        <w:tblPr>
-            <w:tblBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
-                <w:insideH w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
-                <w:insideV w:val="single" w:sz="4" w:space="0" w:color="${isColor ? 'BFBFBF' : '000000'}"/>
-            </w:tblBorders>
-        </w:tblPr>
-    </w:style>
-</w:styles>`;
-    }
-
-    /**
-     * Sanitize filename for safe file system use
-     */
-    sanitizeFilename(filename) {
-        return filename
-            .replace(/[^a-z0-9_\-]/gi, '_')
-            .replace(/_{2,}/g, '_')
-            .replace(/^_|_$/g, '');
-    }
-
-    /**
-     * Create hidden export container for theme-specific rendering
-     */
-    createHiddenExportContainer(html, theme) {
-        const container = document.createElement('div');
-        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;';
-        container.innerHTML = html;
-        
-        if (theme === 'bw') {
-            this.applyBlackWhiteOverrides(container);
-        }
-        
-        document.body.appendChild(container);
-        return container;
-    }
-
-    /**
-     * Apply black & white styling overrides
-     */
-    applyBlackWhiteOverrides(element) {
-        // Apply BW class
-        element.classList.add('export-bw');
-        
-        // Override colors
-        const style = document.createElement('style');
-        style.textContent = `
-            .export-bw {
-                background: white !important;
-                color: black !important;
-            }
-            .export-bw h1, .export-bw h2, .export-bw h3, .export-bw h4, .export-bw h5, .export-bw h6 {
-                color: black !important;
-                border-color: #ccc !important;
-            }
-            .export-bw code {
-                background: #f5f5f5 !important;
-                color: black !important;
-                border-color: #ddd !important;
-            }
-            .export-bw pre {
-                background: #f5f5f5 !important;
-                color: black !important;
-                border-color: #ddd !important;
-            }
-            .export-bw table {
-                background: white !important;
-                border-color: black !important;
-            }
-            .export-bw th {
-                background: #e0e0e0 !important;
-                color: black !important;
-                border-color: black !important;
-            }
-            .export-bw td {
-                background: white !important;
-                color: black !important;
-                border-color: black !important;
-            }
-            .export-bw blockquote {
-                color: #404040 !important;
-                border-color: #666 !important;
-                background: #f9f9f9 !important;
-            }
-            .export-bw .highlight-yellow,
-            .export-bw .highlight-green,
-            .export-bw .highlight-blue {
-                background: transparent !important;
-                font-weight: bold !important;
-                text-decoration: underline !important;
-                color: black !important;
-            }
-            .export-bw .katex {
-                color: black !important;
-            }
-        `;
-        element.appendChild(style);
-    }
+    getDocxStyles() {
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1639,8 +1310,8 @@ class ExportHandler {
         const codeBlocks = container.querySelectorAll('pre');
         codeBlocks.forEach(pre => {
             pre.style.cssText = `
-                background: ${codeBg} !important; 
-                color: ${codeColor} !important; 
+                background: #1e293b !important; 
+                color: #e2e8f0 !important; 
                 padding: 15px; 
                 border-radius: 5px; 
                 margin: 10px 0; 
@@ -1649,61 +1320,33 @@ class ExportHandler {
                 white-space: pre-wrap; 
                 overflow-x: hidden; 
                 page-break-inside: avoid;
-                border: 1px solid ${codeBorder};
+                border: 1px solid rgba(255, 255, 255, 0.1);
             `;
-            // Reset inner code styles so they inherit parent text color
+            // Reset inner code styles so they inherit the white text
             const code = pre.querySelector('code');
             if (code) code.style.cssText = 'background: transparent !important; color: inherit !important; padding: 0;';
         });
 
-        // Inline Code
-        const inlineCodes = container.querySelectorAll('code:not(pre code)');
-        const inlineCodeBg = isColor ? 'rgba(255, 255, 255, 0.1)' : '#f2f2f2';
-        const inlineCodeColor = isColor ? '#e2e8f0' : '#c7254e';
-        const inlineCodeBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd';
-        
-        inlineCodes.forEach(code => {
-            code.style.cssText = `
-                background: ${inlineCodeBg};
-                color: ${inlineCodeColor};
-                padding: 2px 6px;
-                border-radius: 3px;
-                border: 1px solid ${inlineCodeBorder};
-                font-family: 'Consolas', monospace;
-                font-size: 9pt;
-            `;
-        });
-
         // Table Styling
-        const tableBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#bfbfbf';
-        const tableBg = isColor ? 'rgba(255, 255, 255, 0.02)' : '#ffffff';
-        const thBg = isColor ? 'rgba(102, 228, 255, 0.1)' : '#e0e0e0';
-        const thColor = isColor ? '#66e4ff' : '#000000';
-        const tdColor = isColor ? '#e2e8f0' : '#000000';
-        
         const tables = container.querySelectorAll('table');
         tables.forEach(table => {
-            table.style.cssText = `width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; font-size: 10pt; border: 1px solid ${tableBorder}; background: ${tableBg};`;
+            table.style.cssText = 'width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; font-size: 10pt; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.02);';
             
             const ths = table.querySelectorAll('th');
             ths.forEach(th => {
-                th.style.cssText = `background: ${thBg}; color: ${thColor}; padding: 8px; border: 1px solid ${tableBorder}; text-align: left; font-weight: bold;`;
+                th.style.cssText = 'background: rgba(102, 228, 255, 0.1); color: #66e4ff; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: left; font-weight: bold;';
             });
             
             const tds = table.querySelectorAll('td');
             tds.forEach(td => {
-                td.style.cssText = `padding: 8px; border: 1px solid ${tableBorder}; color: ${tdColor};`;
+                td.style.cssText = 'padding: 8px; border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0;';
             });
         });
 
         // Style Blockquotes
-        const bqBorder = isColor ? '#d946ef' : '#666666';
-        const bqColor = isColor ? '#94a3b8' : '#404040';
-        const bqBg = isColor ? 'rgba(255, 255, 255, 0.02)' : '#f9f9f9';
-        
         const blockquotes = container.querySelectorAll('blockquote');
         blockquotes.forEach(bq => {
-            bq.style.cssText = `border-left: 4px solid ${bqBorder}; padding-left: 15px; margin: 10px 0; color: ${bqColor}; font-style: italic; background: ${bqBg}; padding: 10px; border-radius: 0 4px 4px 0;`;
+            bq.style.cssText = 'border-left: 4px solid #d946ef; padding-left: 15px; margin: 10px 0; color: #94a3b8; font-style: italic; background: rgba(255, 255, 255, 0.02); padding: 10px; border-radius: 0 4px 4px 0;';
         });
         
         // Images
@@ -1714,39 +1357,10 @@ class ExportHandler {
         });
         
         // Links
-        const linkColor = isColor ? '#66e4ff' : '#2E74B5';
         const links = container.querySelectorAll('a');
         links.forEach(a => {
-            a.style.color = linkColor;
+            a.style.color = '#66e4ff';
             a.style.textDecoration = 'none';
-        });
-
-        // Lists
-        const lists = container.querySelectorAll('ul, ol');
-        lists.forEach(list => {
-            list.style.color = isColor ? '#e2e8f0' : '#000000';
-        });
-
-        // Paragraphs
-        const paragraphs = container.querySelectorAll('p');
-        paragraphs.forEach(p => {
-            p.style.color = isColor ? '#ffffff' : '#000000';
-        });
-
-        // Strong/Bold
-        const strongs = container.querySelectorAll('strong, b');
-        const strongColor = isColor ? '#66e4ff' : '#000000';
-        strongs.forEach(s => {
-            s.style.color = strongColor;
-            s.style.fontWeight = 'bold';
-        });
-
-        // Emphasis/Italic
-        const ems = container.querySelectorAll('em, i');
-        const emColor = isColor ? '#d946ef' : '#000000';
-        ems.forEach(em => {
-            em.style.color = emColor;
-            em.style.fontStyle = 'italic';
         });
     }
 
@@ -1808,49 +1422,10 @@ class ExportHandler {
     /**
      * Get embedded CSS styles for HTML export
      */
-    getEmbeddedStyles(theme = 'bw') {
-        const isColor = theme === 'color';
-        
-        // Theme-specific colors
-        const bgColor = isColor ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : '#ffffff';
-        const textColor = isColor ? '#ffffff' : '#000000';
-        const titleColor = isColor ? '#66e4ff' : '#2E74B5';
-        const authorColor = isColor ? '#94a3b8' : '#666666';
-        const dateColor = isColor ? '#64748b' : '#999999';
-        const borderColor = isColor ? '#66e4ff' : '#cccccc';
-        const contentBg = isColor ? 'rgba(255, 255, 255, 0.05)' : '#f9f9f9';
-        const contentBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0';
-        const footerColor = isColor ? '#64748b' : '#999999';
-        const codeBg = isColor ? 'rgba(255, 255, 255, 0.1)' : '#f5f5f5';
-        const codeColor = isColor ? '#e2e8f0' : '#c7254e';
-        const preBg = isColor ? '#1e293b' : '#f5f5f5';
-        const preBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd';
-        const preCodeColor = isColor ? '#abb2bf' : '#000000';
-        const tableBorder = isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd';
-        const thBg = isColor ? 'rgba(102, 228, 255, 0.1)' : '#e0e0e0';
-        const thColor = isColor ? '#66e4ff' : '#000000';
-        const trEvenBg = isColor ? 'rgba(255, 255, 255, 0.05)' : '#f9f9f9';
-        const tdColor = isColor ? '#e2e8f0' : '#000000';
-        const bqBorder = isColor ? '#d946ef' : '#666666';
-        const bqColor = isColor ? '#94a3b8' : '#666666';
-        const bqBg = isColor ? 'rgba(255, 255, 255, 0.02)' : '#f9f9f9';
-        const linkColor = isColor ? '#66e4ff' : '#2E74B5';
-        const highlightBg = isColor ? 'rgba(251, 191, 36, 0.2)' : '#ffeb3b';
-        const highlightColor = isColor ? '#fbbf24' : '#000000';
-        
-        const highlightStyle = isColor ? `
-        .highlight-yellow { background-color: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 2px 4px; }
-        .highlight-green { background-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 4px; }
-        .highlight-blue { background-color: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 4px; }
-        .highlight-pink { background-color: rgba(236, 72, 153, 0.2); color: #f472b6; padding: 2px 4px; }` : `
-        .highlight-yellow { background-color: #ffeb3b; color: #000000; padding: 2px 4px; font-weight: bold; }
-        .highlight-green { background-color: #a5d6a7; color: #000000; padding: 2px 4px; font-weight: bold; }
-        .highlight-blue { background-color: #90caf9; color: #000000; padding: 2px 4px; font-weight: bold; }
-        .highlight-pink { background-color: #f48fb1; color: #000000; padding: 2px 4px; font-weight: bold; }`;
-        
+    getEmbeddedStyles() {
         return `
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${isColor ? 'atom-one-dark' : 'github'}.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1858,122 +1433,100 @@ class ExportHandler {
             max-width: 900px;
             margin: 40px auto;
             padding: 20px;
-            color: ${textColor};
-            background: ${bgColor};
+            color: #ffffff;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         }
         .document-header {
             text-align: center;
             margin-bottom: 40px;
             padding-bottom: 20px;
-            border-bottom: 3px solid ${borderColor};
+            border-bottom: 3px solid #66e4ff;
         }
         .document-title {
-            color: ${titleColor};
+            color: #66e4ff;
             font-size: 2.5em;
             margin-bottom: 10px;
         }
         .document-author {
             font-style: italic;
-            color: ${authorColor};
+            color: #94a3b8;
         }
         .document-date {
-            color: ${dateColor};
+            color: #64748b;
         }
         .document-content {
-            background: ${contentBg};
+            background: rgba(255, 255, 255, 0.05);
             padding: 40px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px ${isColor ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'};
-            border: 1px solid ${contentBorder};
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .document-footer {
             text-align: center;
             margin-top: 40px;
-            color: ${footerColor};
+            color: #64748b;
             font-size: 0.9em;
         }
-        h1, h2, h3, h4, h5, h6 {
-            color: ${isColor ? titleColor : '#2E74B5'};
-        }
         code {
-            background-color: ${codeBg};
+            background-color: rgba(255, 255, 255, 0.1);
             padding: 2px 6px;
             border-radius: 3px;
             font-family: 'Consolas', 'Monaco', monospace;
             font-size: 0.9em;
-            color: ${codeColor};
-            border: 1px solid ${isColor ? 'rgba(255, 255, 255, 0.1)' : '#ddd'};
+            color: #e2e8f0;
         }
         pre {
-            background-color: ${preBg};
+            background-color: #1e293b;
             padding: 16px;
             border-radius: 6px;
             overflow-x: auto;
-            border: 1px solid ${preBorder};
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         pre code {
             background: none;
             padding: 0;
-            color: ${preCodeColor};
-            border: none;
+            color: #abb2bf;
         }
         table {
             border-collapse: collapse;
             width: 100%;
             margin: 20px 0;
-            border: 1px solid ${tableBorder};
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         th, td {
-            border: 1px solid ${tableBorder};
+            border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 12px;
             text-align: left;
         }
         th {
-            background-color: ${thBg};
-            color: ${thColor};
+            background-color: rgba(102, 228, 255, 0.1);
+            color: #66e4ff;
             font-weight: 600;
         }
         tr:nth-child(even) {
-            background-color: ${trEvenBg};
+            background-color: rgba(255, 255, 255, 0.05);
         }
         td {
-            color: ${tdColor};
+            color: #e2e8f0;
         }
         .katex-display {
             margin: 1.5em 0;
         }
-        ${highlightStyle}
+        .highlight-yellow { background-color: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 2px 4px; }
+        .highlight-green { background-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 4px; }
+        .highlight-blue { background-color: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 4px; }
+        .highlight-pink { background-color: rgba(236, 72, 153, 0.2); color: #f472b6; padding: 2px 4px; }
         blockquote {
-            border-left: 4px solid ${bqBorder};
+            border-left: 4px solid #d946ef;
             padding-left: 15px;
             margin: 10px 0;
-            color: ${bqColor};
+            color: #94a3b8;
             font-style: italic;
-            background: ${bqBg};
+            background: rgba(255, 255, 255, 0.02);
             padding: 10px;
             border-radius: 0 4px 4px 0;
         }
-        a { 
-            color: ${linkColor}; 
-            text-decoration: none; 
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        strong {
-            color: ${isColor ? '#ffffff' : '#000000'};
-            font-weight: bold;
-        }
-        em {
-            color: ${isColor ? '#e2e8f0' : '#333333'};
-            font-style: italic;
-        }
-        p {
-            color: ${textColor};
-        }
-        ul, ol {
-            color: ${textColor};
-        }
+        a { color: #66e4ff; text-decoration: none; }
     </style>`;
     }
 
