@@ -1470,17 +1470,18 @@ class ExportHandler {
         });
         
         // Math Formulas (KaTeX) - Force black color for B&W theme
-        const mathElements = container.querySelectorAll('.katex, .katex-html, .katex-display');
-        mathElements.forEach(math => {
-            if (theme === 'bw') {
-                math.style.color = '#000000';
-                // Also set color for all child elements
-                const allSpans = math.querySelectorAll('*');
-                allSpans.forEach(span => {
-                    span.style.color = '#000000';
-                });
-            }
-        });
+        if (theme === 'bw') {
+            const mathElements = container.querySelectorAll('.katex, .katex-html, .katex-display, .katex *');
+            mathElements.forEach(math => {
+                math.style.setProperty('color', '#000000', 'important');
+            });
+            
+            // Also target specific KaTeX classes
+            const katexSpecific = container.querySelectorAll('.katex-mathml, .mord, .mbin, .mrel, .mopen, .mclose, .mpunct, .minner, .mop');
+            katexSpecific.forEach(elem => {
+                elem.style.setProperty('color', '#000000', 'important');
+            });
+        }
     }
 
     /**
