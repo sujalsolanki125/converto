@@ -1450,6 +1450,18 @@ class ExportHandler {
             a.style.color = colors.link;
             a.style.textDecoration = 'none';
         });
+
+        // KaTeX Math Formulas - force black color for B&W theme
+        const katexElements = container.querySelectorAll('.katex, .katex-display, .katex-html');
+        katexElements.forEach(el => {
+            el.style.color = colors.text;
+        });
+
+        // Force all KaTeX internal elements to use theme text color
+        const katexInternals = container.querySelectorAll('.katex *');
+        katexInternals.forEach(el => {
+            el.style.color = `${colors.text} !important`;
+        });
     }
 
     /**
