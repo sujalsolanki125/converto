@@ -89,6 +89,20 @@ export default function Preview({ html }: PreviewProps) {
             (window as any).hljs.highlightElement(block)
           })
         }
+
+        // Apply cyan color to headers
+        if (previewRef.current) {
+          const headers = previewRef.current.querySelectorAll('h1, h2, h3, h4')
+          headers.forEach((header) => {
+            const headerElement = header as HTMLElement
+            headerElement.style.setProperty('color', '#66e4ff', 'important')
+            headerElement.style.setProperty('filter', 'drop-shadow(0 0 8px rgba(102, 228, 255, 0.3))')
+            if (header.tagName === 'H1') {
+              headerElement.style.setProperty('border-bottom', '2px solid rgba(102, 228, 255, 0.3)')
+              headerElement.style.setProperty('padding-bottom', '0.3em')
+            }
+          })
+        }
       }
 
       // Calculate statistics

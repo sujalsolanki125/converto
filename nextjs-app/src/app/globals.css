@@ -1146,14 +1146,19 @@ footer {
 }
 
 /* Preview Content Styling - Headers */
+.preview-container h1,
+.preview-container h2,
+.preview-container h3,
+.preview-container h4,
 #preview h1,
 #preview h2,
 #preview h3,
 #preview h4 {
-    color: #66e4ff;
+    color: #66e4ff !important;
     filter: drop-shadow(0 0 8px rgba(102, 228, 255, 0.3));
 }
 
+.preview-container h1,
 #preview h1 {
     font-size: 2em;
     margin: 0.67em 0;
@@ -1161,16 +1166,19 @@ footer {
     padding-bottom: 0.3em;
 }
 
+.preview-container h2,
 #preview h2 {
     font-size: 1.5em;
     margin: 0.83em 0;
 }
 
+.preview-container h3,
 #preview h3 {
     font-size: 1.17em;
     margin: 1em 0;
 }
 
+.preview-container h4,
 #preview h4 {
     font-size: 1em;
     margin: 1.33em 0;
