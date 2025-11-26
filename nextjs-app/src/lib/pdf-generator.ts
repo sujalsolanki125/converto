@@ -1,4 +1,3 @@
-import puppeteer from 'puppeteer'
 import { convertMarkdown } from './markdown-converter'
 
 interface PdfOptions {
@@ -11,6 +10,7 @@ interface PdfOptions {
 
 /**
  * Generate high-quality PDF using Puppeteer
+ * Uses serverless-optimized Chrome on Vercel, standard Puppeteer locally
  */
 export async function generatePdf(options: PdfOptions): Promise<Buffer> {
   const { content, title = 'Document', author = '', date = new Date().toLocaleDateString(), theme = 'color' } = options
@@ -272,23 +272,34 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
 </html>
   `
 
-  // Launch Puppeteer with serverless-optimized configuration
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu'
-    ],
-    // Use system Chrome in production (Vercel provides it)
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 
-                    process.env.CHROME_EXECUTABLE_PATH ||
-                    puppeteer.executablePath(),
-  })
+  // Detect environment and use appropriate Chrome
+  const isVercel = process.env.VERCEL === '1'
+  
+  let browser
+  if (isVercel) {
+    // Production: Use serverless-optimized Chrome
+    const chromium = await import('@sparticuz/chromium')
+    const puppeteerCore = await import('puppeteer-core')
+    
+    browser = await puppeteerCore.default.launch({
+      args: chromium.default.args,
+      defaultViewport: { width: 1280, height: 720 },
+      executablePath: await chromium.default.executablePath(),
+      headless: true,
+    })
+  } else {
+    // Local development: Use standard Puppeteer
+    const puppeteer = await import('puppeteer')
+    
+    browser = await puppeteer.default.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+      ],
+    })
+  }
 
   let page
   try {

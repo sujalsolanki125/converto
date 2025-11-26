@@ -5,8 +5,8 @@
   "regions": ["iad1"],
   "functions": {
     "src/app/api/**/*.ts": {
-      "memory": 2048,
-      "maxDuration": 60
+      "memory": 1024,
+      "maxDuration": 10
     }
   },
   "headers": [
