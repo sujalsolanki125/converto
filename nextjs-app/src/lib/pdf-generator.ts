@@ -272,12 +272,20 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
 </html>
   `
 
-  // Detect environment and use appropriate Chrome
-  const isVercel = process.env.VERCEL === '1'
+  // Detect environment - use multiple checks for reliability
+  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined || process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined
+  
+  console.log('[PDF Generator] Environment:', {
+    VERCEL: process.env.VERCEL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    isVercel,
+    nodeEnv: process.env.NODE_ENV
+  })
   
   let browser
   if (isVercel) {
     // Production: Use serverless-optimized Chrome
+    console.log('[PDF Generator] Using serverless Chrome (@sparticuz/chromium)')
     const chromium = await import('@sparticuz/chromium')
     const puppeteerCore = await import('puppeteer-core')
     
@@ -285,10 +293,11 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
       args: chromium.default.args,
       defaultViewport: { width: 1280, height: 720 },
       executablePath: await chromium.default.executablePath(),
-      headless: true,
+      headless: chromium.default.headless,
     })
   } else {
     // Local development: Use standard Puppeteer
+    console.log('[PDF Generator] Using local Puppeteer')
     const puppeteer = await import('puppeteer')
     
     browser = await puppeteer.default.launch({
