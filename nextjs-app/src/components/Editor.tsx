@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { marked } from 'marked'
+import { convertMarkdown } from '@/lib/markdown-converter'
 // @ts-ignore
 import hljs from 'highlight.js'
 
@@ -15,19 +15,9 @@ export default function Editor({ markdown, setMarkdown, setHtml }: EditorProps) 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    // Configure marked with renderer for syntax highlighting
-    const renderer = new marked.Renderer()
-    marked.setOptions({
-      gfm: true,
-      breaks: true,
-      renderer: renderer
-    })
-  }, [])
-
-  useEffect(() => {
-    // Update preview whenever markdown changes
+    // Update preview whenever markdown changes using our converter
     try {
-      const html = marked(markdown) as string
+      const html = convertMarkdown(markdown)
       setHtml(html)
     } catch (error) {
       console.error('Error parsing markdown:', error)

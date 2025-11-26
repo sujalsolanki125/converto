@@ -3,24 +3,33 @@ import katex from 'katex'
 
 /**
  * Convert Markdown to HTML with LaTeX support
+ * Uses the same approach as the original working HTML app
  */
 export function convertMarkdown(markdown: string): string {
   if (!markdown) return ''
 
   try {
-    // Pre-process math equations
+    // Pre-process math equations (extract and replace with placeholders)
     const { content: processedMarkdown, displayMaths, inlineMaths } = preprocessMath(markdown)
 
-    // Configure marked
+    // Configure marked with custom renderer
+    const renderer = new marked.Renderer()
+    
+    // Override heading renderer to add cyan color
+    renderer.heading = function(text, level) {
+      return `<h${level} style="color: #66e4ff !important; filter: drop-shadow(0 0 8px rgba(102, 228, 255, 0.3));">${text}</h${level}>`
+    }
+    
     marked.setOptions({
       breaks: true,
-      gfm: true
+      gfm: true,
+      renderer: renderer
     })
 
     // Convert markdown to HTML
     let html = marked.parse(processedMarkdown) as string
 
-    // Post-process math equations
+    // Post-process: render math equations with KaTeX
     html = postprocessMath(html, displayMaths, inlineMaths)
 
     return html
@@ -32,6 +41,7 @@ export function convertMarkdown(markdown: string): string {
 
 /**
  * Pre-process LaTeX math equations
+ * Extract math and replace with placeholders to protect from markdown parser
  */
 function preprocessMath(markdown: string) {
   const displayMaths: string[] = []
@@ -46,13 +56,13 @@ function preprocessMath(markdown: string) {
   // Convert ChatGPT-style ( \command... ) to $...$
   markdown = markdown.replace(/\(\s+(\\[a-zA-Z]+[^)]*?)\s+\)/g, (_, equation) => `$${equation.trim()}$`)
 
-  // Process display math ($$...$$)
+  // Process display math ($$...$$) - handle multi-line
   markdown = markdown.replace(/\$\$([\s\S]*?)\$\$/g, (_, equation) => {
     displayMaths.push(equation.trim())
     return `\n%%%DISPLAY_MATH_${displayMaths.length - 1}%%%\n`
   })
 
-  // Process inline math ($...$)
+  // Process inline math ($...$) - avoid matching across lines
   markdown = markdown.replace(/\$([^\$\n]+?)\$/g, (_, equation) => {
     inlineMaths.push(equation.trim())
     return `%%%INLINE_MATH_${inlineMaths.length - 1}%%%`
@@ -62,7 +72,8 @@ function preprocessMath(markdown: string) {
 }
 
 /**
- * Post-process HTML to render math
+ * Post-process HTML to render math with KaTeX
+ * Replace placeholders with rendered KaTeX HTML
  */
 function postprocessMath(html: string, displayMaths: string[], inlineMaths: string[]): string {
   // Render display math

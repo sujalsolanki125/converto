@@ -18,7 +18,7 @@ export default function Preview({ html }: PreviewProps) {
   const previewRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Render KaTeX equations after HTML is set
+    // Set HTML content (math already rendered server-side by markdown converter)
     if (previewRef.current) {
       // Set HTML content or welcome message
       if (html) {
@@ -63,25 +63,9 @@ export default function Preview({ html }: PreviewProps) {
         `
       }
 
-      // Then render math with KaTeX if there's content
-      if (html) {
-        try {
-          // Use auto-render for KaTeX
-          if (typeof window !== 'undefined' && (window as any).renderMathInElement) {
-            (window as any).renderMathInElement(previewRef.current, {
-              delimiters: [
-                {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false},
-                {left: '\\[', right: '\\]', display: true},
-                {left: '\\(', right: '\\)', display: false}
-              ],
-              throwOnError: false,
-              strict: false
-            })
-          }
-        } catch (err) {
-          console.error('KaTeX rendering error:', err)
-        }
+      // Wait for DOM to update before applying additional processing
+      requestAnimationFrame(() => {
+        if (!previewRef.current) return
 
         // Highlight code blocks
         if (typeof window !== 'undefined' && (window as any).hljs) {
@@ -91,19 +75,17 @@ export default function Preview({ html }: PreviewProps) {
         }
 
         // Apply cyan color to headers
-        if (previewRef.current) {
-          const headers = previewRef.current.querySelectorAll('h1, h2, h3, h4')
-          headers.forEach((header) => {
-            const headerElement = header as HTMLElement
-            headerElement.style.setProperty('color', '#66e4ff', 'important')
-            headerElement.style.setProperty('filter', 'drop-shadow(0 0 8px rgba(102, 228, 255, 0.3))')
-            if (header.tagName === 'H1') {
-              headerElement.style.setProperty('border-bottom', '2px solid rgba(102, 228, 255, 0.3)')
-              headerElement.style.setProperty('padding-bottom', '0.3em')
-            }
-          })
-        }
-      }
+        const headers = previewRef.current.querySelectorAll('h1, h2, h3, h4')
+        headers.forEach((header) => {
+          const headerElement = header as HTMLElement
+          // Force cyan color with highest priority
+          headerElement.setAttribute('style', 'color: #66e4ff !important; filter: drop-shadow(0 0 8px rgba(102, 228, 255, 0.3)) !important;')
+          if (header.tagName === 'H1') {
+            const currentStyle = headerElement.getAttribute('style') || ''
+            headerElement.setAttribute('style', currentStyle + ' border-bottom: 2px solid rgba(102, 228, 255, 0.3) !important; padding-bottom: 0.3em !important;')
+          }
+        })
+      })
 
       // Calculate statistics
       calculateStats()
