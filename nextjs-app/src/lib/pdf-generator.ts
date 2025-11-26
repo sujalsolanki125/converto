@@ -289,10 +289,26 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
     const chromium = await import('@sparticuz/chromium')
     const puppeteerCore = await import('puppeteer-core')
     
+    // Force chromium to use the correct path
+    const executablePath = await chromium.default.executablePath({
+      fontConfigPath: '/tmp/.fonts',
+    })
+    
+    console.log('[PDF Generator] Chrome executable path:', executablePath)
+    
     browser = await puppeteerCore.default.launch({
-      args: chromium.default.args,
+      args: [
+        ...chromium.default.args,
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-setuid-sandbox',
+        '--no-first-run',
+        '--no-sandbox',
+        '--no-zygote',
+        '--single-process',
+      ],
       defaultViewport: { width: 1280, height: 720 },
-      executablePath: await chromium.default.executablePath(),
+      executablePath,
       headless: chromium.default.headless,
     })
   } else {
