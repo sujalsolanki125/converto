@@ -44,10 +44,14 @@ export async function generateDocx(options: DocxOptions): Promise<ArrayBuffer> {
   zip.file('word/settings.xml', getDocxSettings());
 
   // Generate DOCX buffer
+  // Use STORE (no compression) for better compatibility with Microsoft Word
   const buffer = await zip.generateAsync({
     type: 'arraybuffer',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 6 }
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    compression: 'STORE',
+    compressionOptions: {
+      level: 0
+    }
   });
 
   return buffer;
