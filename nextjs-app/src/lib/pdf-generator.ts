@@ -272,17 +272,35 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
 </html>
   `
 
-  // Launch Puppeteer
+  // Launch Puppeteer with serverless-optimized configuration
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ],
+    // Use system Chrome in production (Vercel provides it)
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 
+                    process.env.CHROME_EXECUTABLE_PATH ||
+                    puppeteer.executablePath(),
   })
 
+  let page
   try {
-    const page = await browser.newPage()
+    page = await browser.newPage()
+    
+    // Set timeout for production environments
+    await page.setDefaultNavigationTimeout(30000)
+    await page.setDefaultTimeout(30000)
+    
     await page.setContent(html, { waitUntil: 'networkidle0' })
 
-    // Generate PDF
+    // Generate PDF with production-ready settings
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
@@ -292,10 +310,15 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
         bottom: '20mm',
         left: '15mm',
       },
+      preferCSSPageSize: false,
     })
 
     return Buffer.from(pdfBuffer)
+  } catch (error) {
+    console.error('PDF generation failed:', error)
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
-    await browser.close()
+    if (page) await page.close().catch(console.error)
+    await browser.close().catch(console.error)
   }
 }

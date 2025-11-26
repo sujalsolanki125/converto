@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Editor from '@/components/Editor'
 import Preview from '@/components/Preview'
 import ExportButtons from '@/components/ExportButtons'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 export default function Home() {
   const [markdown, setMarkdown] = useState('')
@@ -15,18 +16,19 @@ export default function Home() {
   const [showHowToUse, setShowHowToUse] = useState(false)
 
   return (
-    <div className="container">
-      <header>
-        <div className="header-left">
-          <div className="logo">Converto</div>
-          <p className="tagline">Transform AI-generated content into professional documents</p>
-        </div>
-        <div className="header-right">
-          <button onClick={() => setShowHowToUse(!showHowToUse)} className="btn btn-how-to-use" title="How to Use">
-            <span>❓</span> How to Use
-          </button>
-        </div>
-      </header>
+    <ErrorBoundary>
+      <div className="container">
+        <header>
+          <div className="header-left">
+            <div className="logo">Converto</div>
+            <p className="tagline">Transform AI-generated content into professional documents</p>
+          </div>
+          <div className="header-right">
+            <button onClick={() => setShowHowToUse(!showHowToUse)} className="btn btn-how-to-use" title="How to Use">
+              <span>❓</span> How to Use
+            </button>
+          </div>
+        </header>
 
       <div className="main-content">
         <Editor 
@@ -121,6 +123,7 @@ export default function Home() {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }

@@ -78,6 +78,7 @@ export default function Preview({ html }: PreviewProps) {
       // Calculate statistics
       calculateStats()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [html])
 
   const calculateStats = () => {

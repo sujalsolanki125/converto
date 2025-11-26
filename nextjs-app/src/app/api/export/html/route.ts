@@ -3,16 +3,28 @@ import { convertMarkdown } from '@/lib/markdown-converter'
 
 export async function POST(request: NextRequest) {
   try {
+    // Parse and validate request body
     const body = await request.json()
     const { content, title = 'Document', options = {} } = body
     const theme = options.theme || 'color'
 
-    if (!content) {
+    // Validate content
+    if (!content || typeof content !== 'string') {
       return NextResponse.json(
-        { error: 'Content is required' },
+        { error: 'Valid content is required' },
         { status: 400 }
       )
     }
+
+    // Validate content length (prevent abuse)
+    if (content.length > 1000000) { // 1MB limit
+      return NextResponse.json(
+        { error: 'Content too large. Maximum 1MB allowed.' },
+        { status: 413 }
+      )
+    }
+
+    console.log(`[HTML Export] Generating HTML for document: "${title}" (${content.length} chars)`)
 
     // Convert markdown to HTML
     const bodyHTML = convertMarkdown(content)
@@ -117,17 +129,23 @@ export async function POST(request: NextRequest) {
 </html>
     `
 
+    console.log(`[HTML Export] Successfully generated HTML (${html.length} bytes)`)
+
     // Return as downloadable file
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html;charset=utf-8',
-        'Content-Disposition': `attachment; filename="${title.toLowerCase().replace(/\s+/g, '-')}.html"`,
+        'Content-Disposition': `attachment; filename="${title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.html"`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     })
   } catch (error) {
-    console.error('HTML generation error:', error)
+    console.error('[HTML Export] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to generate HTML', details: String(error) },
+      { 
+        error: 'Failed to generate HTML', 
+        details: process.env.NODE_ENV === 'development' ? String(error) : 'Internal server error'
+      },
       { status: 500 }
     )
   }
