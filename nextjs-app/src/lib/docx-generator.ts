@@ -1,6 +1,5 @@
 import JSZip from 'jszip';
 import { JSDOM } from 'jsdom';
-import katex from 'katex';
 
 interface DocxOptions {
   content: string;
@@ -56,84 +55,6 @@ export async function generateDocx(options: DocxOptions): Promise<ArrayBuffer> {
   });
 
   return buffer;
-}
-
-/**
- * Convert LaTeX to OMML (Office Math Markup Language) for Word
- */
-function convertLatexToOmml(latex: string, isDisplay: boolean = false): string {
-  try {
-    // Use KaTeX to convert LaTeX to MathML
-    const mathml = katex.renderToString(latex, {
-      displayMode: isDisplay,
-      output: 'mathml',
-      throwOnError: false,
-      trust: true,
-      strict: false,
-    });
-
-    // Convert MathML to OMML
-    const omml = mathmlToOmml(mathml);
-    
-    // Wrap in Word paragraph structure
-    if (isDisplay) {
-      return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${omml}</w:p>`;
-    } else {
-      return omml; // Inline math
-    }
-  } catch (error) {
-    console.error('LaTeX to OMML error:', error);
-    // Fallback: return as italic text
-    return `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
-  }
-}
-
-/**
- * Convert MathML to OMML format
- */
-function mathmlToOmml(mathml: string): string {
-  // Basic MathML to OMML conversion
-  let omml = mathml
-    // Main math wrapper
-    .replace(/<math[^>]*>/g, '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath>')
-    .replace(/<\/math>/g, '</m:oMath></m:oMathPara>')
-    
-    // Row (grouping)
-    .replace(/<mrow>/g, '<m:r>')
-    .replace(/<\/mrow>/g, '</m:r>')
-    
-    // Identifiers, operators, numbers
-    .replace(/<mi([^>]*)>(.*?)<\/mi>/g, '<m:r><m:t>$2</m:t></m:r>')
-    .replace(/<mo([^>]*)>(.*?)<\/mo>/g, '<m:r><m:t>$2</m:t></m:r>')
-    .replace(/<mn([^>]*)>(.*?)<\/mn>/g, '<m:r><m:t>$2</m:t></m:r>')
-    
-    // Superscript
-    .replace(/<msup>/g, '<m:sSup><m:e>')
-    .replace(/<\/msup>/g, '</m:e><m:sup></m:sup></m:sSup>')
-    
-    // Subscript
-    .replace(/<msub>/g, '<m:sSub><m:e>')
-    .replace(/<\/msub>/g, '</m:e><m:sub></m:sub></m:sSub>')
-    
-    // Fraction
-    .replace(/<mfrac>/g, '<m:f><m:num>')
-    .replace(/<\/mfrac>/g, '</m:den></m:f>')
-    
-    // Square root
-    .replace(/<msqrt>/g, '<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg></m:deg><m:e>')
-    .replace(/<\/msqrt>/g, '</m:e></m:rad>')
-    
-    // N-th root
-    .replace(/<mroot>/g, '<m:rad><m:deg>')
-    .replace(/<\/mroot>/g, '</m:e></m:rad>')
-    
-    // Text
-    .replace(/<mtext([^>]*)>(.*?)<\/mtext>/g, '<m:r><m:t>$2</m:t></m:r>');
-
-  // Clean up any remaining MathML tags
-  omml = omml.replace(/<\/?m(style|table|space|over|under)[^>]*>/g, '');
-
-  return omml;
 }
 
 /**
@@ -214,25 +135,16 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
         case 'br':
           return '<w:r><w:br/></w:r>';
         case 'span':
-        case 'div':
-          // Check if this is a KaTeX math element
-          const className = node.className || node.getAttribute?.('class') || '';
-          if (typeof className === 'string' && (className.includes('katex') || className.includes('math'))) {
-            // Extract the LaTeX annotation from KaTeX output
-            const annotation = node.querySelector('annotation[encoding="application/x-tex"]');
-            if (annotation && annotation.textContent) {
-              const latex = annotation.textContent;
-              const isDisplay = className.includes('katex-display') || className.includes('display');
-              return convertLatexToOmml(latex, isDisplay);
-            }
-            // Fallback: try to extract from title attribute or text content
-            const title = node.getAttribute?.('title');
-            if (title) {
-              return convertLatexToOmml(title, false);
-            }
+        case 'div': {
+          // Check if this element has LaTeX data (from our markdown converter)
+          const latex = node.getAttribute('data-latex');
+          if (latex) {
+            // Return original LaTeX as plain text in Word
+            return `<w:r><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
           }
-          // Handle other spans/divs - extract text
+          // For non-math spans/divs, process children normally
           return processChildren(node);
+        }
         default:
           return processChildren(node);
       }
@@ -250,7 +162,6 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-            xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
             xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
             xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
             xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">
@@ -300,13 +211,20 @@ function processChildren(node: any): string {
       } else if (tagName === 'a') {
         result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
       } else if (tagName === 'span' || tagName === 'div') {
-        // Handle spans/divs (like KaTeX output) by recursing
-        Array.from(child.childNodes).forEach((grandchild: any) => {
-          if (grandchild.nodeType === 3) {
-            const t = grandchild.textContent;
-            if (t) result += `<w:r><w:t xml:space="preserve">${escapeXml(t)}</w:t></w:r>`;
-          }
-        });
+        // Check if this element has LaTeX data (from our markdown converter)
+        const latex = (child as any).getAttribute('data-latex');
+        if (latex) {
+          // Return original LaTeX as plain text in Word
+          result += `<w:r><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
+        } else {
+          // Handle regular spans/divs by recursing
+          Array.from(child.childNodes).forEach((grandchild: any) => {
+            if (grandchild.nodeType === 3) {
+              const t = grandchild.textContent;
+              if (t) result += `<w:r><w:t xml:space="preserve">${escapeXml(t)}</w:t></w:r>`;
+            }
+          });
+        }
       } else {
         result += `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
       }

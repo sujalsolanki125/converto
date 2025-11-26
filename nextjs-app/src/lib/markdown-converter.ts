@@ -74,13 +74,16 @@ function postprocessMath(html: string, displayMaths: string[], inlineMaths: stri
     const patterns = [`<p>${placeholder}</p>`, placeholder]
 
     try {
+      // Render with output: 'html' but store original LaTeX in data attribute for DOCX export
       const rendered = katex.renderToString(equation, {
         displayMode: true,
         throwOnError: false,
         trust: true,
         strict: false,
       })
-      const wrappedRendered = `<div class="katex-display-wrapper my-4">${rendered}</div>`
+      
+      // Wrap with data attribute containing original LaTeX for easy extraction
+      const wrappedRendered = `<div class="katex-display-wrapper my-4" data-latex="${escapeHtml(equation)}">${rendered}</div>`
 
       patterns.forEach(pattern => {
         html = html.split(pattern).join(wrappedRendered)
@@ -99,13 +102,18 @@ function postprocessMath(html: string, displayMaths: string[], inlineMaths: stri
     const placeholder = `%%%INLINE_MATH_${index}%%%`
 
     try {
+      // Render with output: 'html' but store original LaTeX in data attribute for DOCX export
       const rendered = katex.renderToString(equation, {
         displayMode: false,
         throwOnError: false,
         trust: true,
         strict: false,
       })
-      html = html.split(placeholder).join(rendered)
+      
+      // Wrap with data attribute containing original LaTeX for easy extraction
+      const wrappedRendered = `<span class="katex-inline" data-latex="${escapeHtml(equation)}">${rendered}</span>`
+      
+      html = html.split(placeholder).join(wrappedRendered)
     } catch (e: any) {
       console.error('Inline math error:', e.message)
       html = html.split(placeholder).join(`<span class="math-error text-red-500">$${equation}$</span>`)
@@ -113,6 +121,18 @@ function postprocessMath(html: string, displayMaths: string[], inlineMaths: stri
   })
 
   return html
+}
+
+/**
+ * Escape HTML for attribute values
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }
 
 /**
