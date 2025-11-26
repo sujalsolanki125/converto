@@ -113,9 +113,16 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
             return ''; // Handled by pre
           }
           return `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${escapeXml(node.textContent)}</w:t></w:r>`;
-        case 'pre':
-          const codeText = node.textContent;
-          return `<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:color w:val="000000"/></w:rPr><w:t xml:space="preserve">${escapeXml(codeText)}</w:t></w:r></w:p>`;
+        case 'pre': {
+          // Handle code blocks - split by lines for better formatting
+          const codeText = node.textContent || '';
+          const lines = codeText.split('\n');
+          let result = '';
+          lines.forEach((line, index) => {
+            result += `<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/></w:rPr><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`;
+          });
+          return result;
+        }
         case 'ul':
         case 'ol':
           return processListItems(node, tagName === 'ol');
@@ -127,6 +134,10 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
           return processTable(node);
         case 'br':
           return '<w:r><w:br/></w:r>';
+        case 'span':
+        case 'div':
+          // Handle KaTeX and other spans/divs - just extract text
+          return processChildren(node);
         default:
           return processChildren(node);
       }
@@ -192,6 +203,14 @@ function processChildren(node: any): string {
         result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
       } else if (tagName === 'a') {
         result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+      } else if (tagName === 'span' || tagName === 'div') {
+        // Handle spans/divs (like KaTeX output) by recursing
+        Array.from(child.childNodes).forEach((grandchild: any) => {
+          if (grandchild.nodeType === 3) {
+            const t = grandchild.textContent;
+            if (t) result += `<w:r><w:t xml:space="preserve">${escapeXml(t)}</w:t></w:r>`;
+          }
+        });
       } else {
         result += `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
       }
