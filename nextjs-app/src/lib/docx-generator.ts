@@ -66,15 +66,6 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
 
   let wordXml = '';
 
-  // Add title section
-  wordXml += `<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>${escapeXml(title)}</w:t></w:r></w:p>`;
-
-  // Add metadata section
-  if (author || date) {
-    const metaText = [author, date].filter(Boolean).join(' • ');
-    wordXml += `<w:p><w:pPr><w:pStyle w:val="Subtitle"/></w:pPr><w:r><w:t>${escapeXml(metaText)}</w:t></w:r></w:p>`;
-  }
-
   // Process body content
   const processNode = (node: any): string => {
     if (!node) return '';
@@ -147,14 +138,33 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
     wordXml += processNode(node);
   });
 
+  // Theme-aware date color
+  const dateColor = theme === 'bw' ? '000000' : '808080';
+
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
-            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+            xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">
     <w:body>
+        <w:p>
+            <w:pPr><w:pStyle w:val="Title"/></w:pPr>
+            <w:r><w:t>${escapeXml(title)}</w:t></w:r>
+        </w:p>
+        ${author ? `<w:p>
+            <w:pPr><w:pStyle w:val="Subtitle"/></w:pPr>
+            <w:r><w:rPr><w:i/></w:rPr><w:t>By ${escapeXml(author)}</w:t></w:r>
+        </w:p>` : ''}
+        <w:p>
+            <w:pPr><w:jc w:val="center"/></w:pPr>
+            <w:r><w:rPr><w:sz w:val="20"/><w:color w:val="${dateColor}"/></w:rPr><w:t>${escapeXml(date)}</w:t></w:r>
+        </w:p>
         ${wordXml}
         <w:sectPr>
             <w:pgSz w:w="12240" w:h="15840"/>
-            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+            <w:cols w:space="720"/>
         </w:sectPr>
     </w:body>
 </w:document>`;

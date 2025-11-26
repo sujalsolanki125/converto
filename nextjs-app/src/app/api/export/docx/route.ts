@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocx } from '@/lib/docx-generator'
+import { convertMarkdown } from '@/lib/markdown-converter'
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,9 +15,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Convert markdown to HTML first (like the original app does)
+    const htmlContent = convertMarkdown(content)
+
     // Generate DOCX
     const docxBuffer = await generateDocx({
-      content,
+      content: htmlContent,
       title,
       author,
       date,
