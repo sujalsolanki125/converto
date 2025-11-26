@@ -1183,3 +1183,18 @@ footer {
     font-size: 1em;
     margin: 1.33em 0;
 }
+
+/* Loading animation for export buttons */
+@keyframes pulse {
+    0%, 100% { 
+        opacity: 1; 
+    }
+    50% { 
+        opacity: 0.5; 
+    }
+}
+
+.btn-export:disabled {
+    animation: pulse 1.5s ease-in-out infinite;
+    pointer-events: none;
+}

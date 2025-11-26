@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 interface ExportButtonsProps {
   markdown: string
   html: string
@@ -25,6 +27,15 @@ export default function ExportButtons({
   pdfTheme,
   setPdfTheme
 }: ExportButtonsProps) {
+  const [loadingState, setLoadingState] = useState<{
+    html: boolean
+    docx: boolean
+    pdf: boolean
+  }>({
+    html: false,
+    docx: false,
+    pdf: false
+  })
 
   const exportToHTML = async () => {
     if (!markdown.trim()) {
@@ -32,6 +43,7 @@ export default function ExportButtons({
       return
     }
 
+    setLoadingState(prev => ({ ...prev, html: true }))
     try {
       const response = await fetch('/api/export/html', {
         method: 'POST',
@@ -58,6 +70,8 @@ export default function ExportButtons({
       window.URL.revokeObjectURL(url)
     } catch (error) {
       alert('Export failed: ' + (error as Error).message)
+    } finally {
+      setLoadingState(prev => ({ ...prev, html: false }))
     }
   }
 
@@ -67,6 +81,7 @@ export default function ExportButtons({
       return
     }
 
+    setLoadingState(prev => ({ ...prev, docx: true }))
     try {
       const response = await fetch('/api/export/docx', {
         method: 'POST',
@@ -96,6 +111,8 @@ export default function ExportButtons({
       window.URL.revokeObjectURL(url)
     } catch (error) {
       alert('Export failed: ' + (error as Error).message)
+    } finally {
+      setLoadingState(prev => ({ ...prev, docx: false }))
     }
   }
 
@@ -105,6 +122,7 @@ export default function ExportButtons({
       return
     }
 
+    setLoadingState(prev => ({ ...prev, pdf: true }))
     try {
       const response = await fetch('/api/export/pdf', {
         method: 'POST',
@@ -134,6 +152,8 @@ export default function ExportButtons({
       window.URL.revokeObjectURL(url)
     } catch (error) {
       alert('Export failed: ' + (error as Error).message)
+    } finally {
+      setLoadingState(prev => ({ ...prev, pdf: false }))
     }
   }
 
@@ -168,14 +188,29 @@ export default function ExportButtons({
     <section className="export-section">
       <h3>💾 Export Options</h3>
       <div className="export-buttons">
-        <button onClick={exportToHTML} className="btn btn-export btn-html">
-          🌐 Export to HTML
+        <button 
+          onClick={exportToHTML} 
+          className="btn btn-export btn-html"
+          disabled={loadingState.html}
+          style={{ opacity: loadingState.html ? 0.6 : 1, cursor: loadingState.html ? 'not-allowed' : 'pointer' }}
+        >
+          {loadingState.html ? '⏳ Preparing HTML...' : '🌐 Export to HTML'}
         </button>
-        <button onClick={exportToDOCX} className="btn btn-export btn-docx">
-          📄 Export to DOCX
+        <button 
+          onClick={exportToDOCX} 
+          className="btn btn-export btn-docx"
+          disabled={loadingState.docx}
+          style={{ opacity: loadingState.docx ? 0.6 : 1, cursor: loadingState.docx ? 'not-allowed' : 'pointer' }}
+        >
+          {loadingState.docx ? '⏳ Creating DOCX...' : '📄 Export to DOCX'}
         </button>
-        <button onClick={exportToPDF} className="btn btn-export btn-pdf">
-          📕 Export to PDF
+        <button 
+          onClick={exportToPDF} 
+          className="btn btn-export btn-pdf"
+          disabled={loadingState.pdf}
+          style={{ opacity: loadingState.pdf ? 0.6 : 1, cursor: loadingState.pdf ? 'not-allowed' : 'pointer' }}
+        >
+          {loadingState.pdf ? '⏳ Generating PDF...' : '📕 Export to PDF'}
         </button>
         <button onClick={copyFormattedContent} className="btn btn-export btn-copy">
           📋 Copy Formatted
