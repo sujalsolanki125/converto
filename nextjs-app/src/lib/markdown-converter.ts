@@ -12,18 +12,10 @@ export function convertMarkdown(markdown: string): string {
     // Pre-process math equations (extract and replace with placeholders)
     const { content: processedMarkdown, displayMaths, inlineMaths } = preprocessMath(markdown)
 
-    // Configure marked with custom renderer
-    const renderer = new marked.Renderer()
-    
-    // Override heading renderer to add cyan color
-    renderer.heading = function(text, level) {
-      return `<h${level} style="color: #66e4ff !important; filter: drop-shadow(0 0 8px rgba(102, 228, 255, 0.3));">${text}</h${level}>`
-    }
-    
+    // Configure marked (no custom renderer - CSS will style headers)
     marked.setOptions({
       breaks: true,
-      gfm: true,
-      renderer: renderer
+      gfm: true
     })
 
     // Convert markdown to HTML
