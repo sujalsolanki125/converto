@@ -289,26 +289,29 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
     const chromium = await import('@sparticuz/chromium')
     const puppeteerCore = await import('puppeteer-core')
     
-    // Get Chrome executable path
-    const executablePath = await chromium.default.executablePath()
-    
-    console.log('[PDF Generator] Chrome executable path:', executablePath)
-    
-    browser = await puppeteerCore.default.launch({
-      args: [
-        ...chromium.default.args,
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-        '--disable-setuid-sandbox',
-        '--no-first-run',
-        '--no-sandbox',
-        '--no-zygote',
-        '--single-process',
-      ],
-      defaultViewport: { width: 1280, height: 720 },
-      executablePath,
-      headless: chromium.default.headless,
-    })
+    try {
+      // Critical: Get executable path before launch
+      const executablePath = await chromium.default.executablePath()
+      
+      console.log('[PDF Generator] Chrome will be launched with:')
+      console.log('  - Executable:', executablePath)
+      console.log('  - Args count:', chromium.default.args.length)
+      
+      browser = await puppeteerCore.default.launch({
+        args: chromium.default.args,
+        defaultViewport: chromium.default.defaultViewport,
+        executablePath,
+        headless: chromium.default.headless,
+        ignoreHTTPSErrors: true,
+        dumpio: true, // Log browser console to help debug
+      })
+      
+      console.log('[PDF Generator] Chrome launched successfully')
+    } catch (error) {
+      console.error('[PDF Generator] Chrome launch failed:', error)
+      console.error('[PDF Generator] Error stack:', error instanceof Error ? error.stack : 'No stack')
+      throw new Error(`Failed to launch browser: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   } else {
     // Local development: Use standard Puppeteer
     console.log('[PDF Generator] Using local Puppeteer')
