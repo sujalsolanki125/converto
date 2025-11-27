@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { JSDOM } from 'jsdom';
+import katex from 'katex';
 
 interface DocxOptions {
   content: string;
@@ -9,10 +10,6 @@ interface DocxOptions {
   theme?: 'color' | 'bw';
 }
 
-/**
- * Generate DOCX document from markdown content using JSZip
- * Based on the working implementation from the original app
- */
 export async function generateDocx(options: DocxOptions): Promise<ArrayBuffer> {
   const {
     content,
@@ -66,14 +63,15 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
 
   let wordXml = '';
 
-  // Process body content
+  // Process body content - Ensure EVERYTHING is wrapped in a <w:p>
   const processNode = (node: any): string => {
     if (!node) return '';
 
+    // FIX 1: Wrap root text nodes in <w:p>
     if (node.nodeType === 3) { // Text node
       const text = node.textContent || '';
       if (text.trim()) {
-        return `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+        return `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
       }
       return '';
     }
@@ -82,71 +80,65 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
       const tagName = node.tagName?.toLowerCase();
       
       switch (tagName) {
-        case 'h1': {
-          const content = processChildren(node) || '<w:r><w:t></w:t></w:r>';
-          return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${content}</w:p>`;
-        }
-        case 'h2': {
-          const content = processChildren(node) || '<w:r><w:t></w:t></w:r>';
-          return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${content}</w:p>`;
-        }
-        case 'h3': {
-          const content = processChildren(node) || '<w:r><w:t></w:t></w:r>';
-          return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${content}</w:p>`;
-        }
-        case 'h4': {
-          const content = processChildren(node) || '<w:r><w:t></w:t></w:r>';
-          return `<w:p><w:pPr><w:pStyle w:val="Heading4"/></w:pPr>${content}</w:p>`;
-        }
-        case 'p': {
-          const content = processChildren(node) || '<w:r><w:t></w:t></w:r>';
-          return `<w:p>${content}</w:p>`;
-        }
-        case 'strong':
-        case 'b':
-          return `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(node.textContent)}</w:t></w:r>`;
-        case 'em':
-        case 'i':
-          return `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${escapeXml(node.textContent)}</w:t></w:r>`;
-        case 'code':
-          if (node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre') {
-            return ''; // Handled by pre
-          }
-          return `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${escapeXml(node.textContent)}</w:t></w:r>`;
+        // Headers
+        case 'h1': return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${processChildren(node)}</w:p>`;
+        case 'h2': return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${processChildren(node)}</w:p>`;
+        case 'h3': return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${processChildren(node)}</w:p>`;
+        case 'h4': return `<w:p><w:pPr><w:pStyle w:val="Heading4"/></w:pPr>${processChildren(node)}</w:p>`;
+        
+        // Block Elements
+        case 'p': return `<w:p>${processChildren(node)}</w:p>`;
+        case 'blockquote': return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${processChildren(node)}</w:p>`;
+        
+        // Lists
+        case 'ul': return processListItems(node, false);
+        case 'ol': return processListItems(node, true);
+        
+        // Tables
+        case 'table': return processTable(node);
+        
+        // Code Blocks
         case 'pre': {
-          // Handle code blocks - split by lines for better formatting
           const codeText = node.textContent || '';
           const lines = codeText.split('\n');
           let result = '';
-          lines.forEach((line: string, index: number) => {
-            result += `<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/></w:rPr><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`;
+          lines.forEach((line: string) => {
+            const textContent = line ? `<w:t xml:space="preserve">${escapeXml(line)}</w:t>` : '<w:t/>';
+            result += `<w:p><w:pPr><w:pStyle w:val="CodeBlock"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/></w:rPr>${textContent}</w:r></w:p>`;
           });
           return result;
         }
-        case 'ul':
-        case 'ol':
-          return processListItems(node, tagName === 'ol');
-        case 'blockquote': {
-          const content = processChildren(node) || '<w:r><w:t></w:t></w:r>';
-          return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${content}</w:p>`;
-        }
-        case 'table':
-          return processTable(node);
-        case 'br':
-          return '<w:r><w:br/></w:r>';
-        case 'span':
+
+        // Display Math (KaTeX specific divs)
         case 'div': {
-          // Check if this element has LaTeX data (from our markdown converter)
-          const latex = node.getAttribute('data-latex');
-          if (latex) {
-            // Return original LaTeX as plain text in Word
-            return `<w:r><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
+          if (node.className.includes('katex-display')) {
+             // Try to get LaTeX from data attribute first (best fidelity)
+             let latex = node.getAttribute('data-latex');
+             
+             // Fallback to annotation if data attribute missing
+             if (!latex) {
+               const annotation = node.querySelector('annotation[encoding="application/x-tex"]');
+               if (annotation) latex = annotation.textContent;
+             }
+
+             if (latex) {
+                // FIX 2: Render proper OMML Math wrapped in Paragraph
+                return `<w:p>${convertLatexToOmml(latex, true)}</w:p>`;
+             }
           }
-          // For non-math spans/divs, process children normally
-          return processChildren(node);
+          // For non-math divs, process children and wrap if they have content
+          const children = processChildren(node);
+          return children ? `<w:p>${children}</w:p>` : '';
         }
-        default:
-          return processChildren(node);
+
+        case 'br':
+          return '<w:p/>'; // Empty paragraph for line break at root
+
+        // FIX 3: Default handler must wrap content in <w:p> to avoid root-level runs
+        default: {
+          const children = processChildren(node);
+          return children ? `<w:p>${children}</w:p>` : '';
+        }
       }
     }
     return '';
@@ -161,6 +153,7 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
+            xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
             xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
             xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
@@ -202,6 +195,7 @@ function processChildren(node: any): string {
     } else if (child.nodeType === 1) { // Element node
       const tagName = child.tagName.toLowerCase();
       const text = child.textContent;
+      
       if (tagName === 'strong' || tagName === 'b') {
         result += `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
       } else if (tagName === 'em' || tagName === 'i') {
@@ -210,20 +204,28 @@ function processChildren(node: any): string {
         result += `<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F2F2F2"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
       } else if (tagName === 'a') {
         result += `<w:r><w:rPr><w:color w:val="0000FF"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+      } else if (tagName === 'br') {
+        result += `<w:r><w:br/></w:r>`;
       } else if (tagName === 'span' || tagName === 'div') {
-        // Check if this element has LaTeX data (from our markdown converter)
-        const latex = (child as any).getAttribute('data-latex');
-        if (latex) {
-          // Return original LaTeX as plain text in Word
-          result += `<w:r><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
+        // Check if this is a KaTeX math element
+        const className = (child as any).className || '';
+        if (className.includes('katex')) {
+          // Try data attribute first
+          let latex = child.getAttribute('data-latex');
+          
+          // Fallback to annotation
+          if (!latex) {
+            const annotation = (child as any).querySelector('annotation[encoding="application/x-tex"]');
+            if (annotation) latex = annotation.textContent;
+          }
+
+          if (latex) {
+            // Render inline OMML
+            result += convertLatexToOmml(latex, false);
+          }
         } else {
           // Handle regular spans/divs by recursing
-          Array.from(child.childNodes).forEach((grandchild: any) => {
-            if (grandchild.nodeType === 3) {
-              const t = grandchild.textContent;
-              if (t) result += `<w:r><w:t xml:space="preserve">${escapeXml(t)}</w:t></w:r>`;
-            }
-          });
+          result += processChildren(child);
         }
       } else {
         result += `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
@@ -234,14 +236,60 @@ function processChildren(node: any): string {
 }
 
 /**
+ * Convert LaTeX to OMML (Office Math) securely
+ * FIX: Wraps all math elements in <m:r> (Runs) to prevent Word crashes
+ */
+function convertLatexToOmml(latex: string, isDisplay: boolean): string {
+  try {
+    // 1. Render to MathML using KaTeX
+    const mathml = katex.renderToString(latex, {
+      displayMode: isDisplay,
+      output: 'mathml',
+      throwOnError: false,
+      strict: false
+    });
+
+    // 2. Convert MathML to OMML (Corrected Logic)
+    // Replace standard MathML tags with OMML equivalents
+    let omml = mathml
+      .replace(/<math[^>]*>/g, '<m:oMath>')
+      .replace(/<\/math>/g, '</m:oMath>')
+      // Remove MathML grouping that doesn't map 1:1 to OMML
+      .replace(/<mrow>/g, '') 
+      .replace(/<\/mrow>/g, '')
+      // CRITICAL FIX: Wrap content in Runs (m:r) before converting to Text (m:t)
+      // This prevents "orphan text" inside math nodes which crashes Word
+      .replace(/<mi>(.*?)<\/mi>/g, '<m:r><m:t>$1</m:t></m:r>')
+      .replace(/<mo>(.*?)<\/mo>/g, '<m:r><m:t>$1</m:t></m:r>')
+      .replace(/<mn>(.*?)<\/mn>/g, '<m:r><m:t>$1</m:t></m:r>')
+      // Handle superscripts/subscripts
+      .replace(/<msup>/g, '<m:sSup><m:e>')
+      .replace(/<\/msup>/g, '</m:e></m:sSup>')
+      .replace(/<msub>/g, '<m:sSub><m:e>')
+      .replace(/<\/msub>/g, '</m:e></m:sSub>')
+      // Handle fractions
+      .replace(/<mfrac>/g, '<m:f><m:num>')
+      .replace(/<\/mfrac>/g, '</m:den></m:f>')
+      // Clean up common entities
+      .replace(/&minus;/g, '-')
+      .replace(/&infin;/g, '∞');
+
+    return omml;
+  } catch (e) {
+    // Fallback: If math conversion fails, return as plain text (safe)
+    return `<w:r><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
+  }
+}
+
+/**
  * Process list items
  */
 function processListItems(listNode: any, isOrdered: boolean): string {
   let result = '';
   const items = listNode.querySelectorAll(':scope > li');
   items.forEach((li: any) => {
-    const text = li.textContent.trim() || '';
-    result += `<w:p><w:pPr><w:pStyle w:val="${isOrdered ? 'ListNumber' : 'ListBullet'}"/></w:pPr><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+    // We use processChildren here to preserve bold/italic/math inside list items
+    result += `<w:p><w:pPr><w:pStyle w:val="${isOrdered ? 'ListNumber' : 'ListBullet'}"/></w:pPr>${processChildren(li)}</w:p>`;
   });
   return result;
 }
@@ -259,6 +307,7 @@ function processTable(tableNode: any): string {
     cells.forEach((cell: any) => {
       const isHeader = cell.tagName.toLowerCase() === 'th';
       const text = cell.textContent.trim() || '';
+      
       result += '<w:tc><w:tcPr>';
       if (isHeader) {
         result += '<w:shd w:fill="F0F0F0"/>';
