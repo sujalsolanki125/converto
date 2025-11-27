@@ -284,33 +284,60 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
   
   let browser
   if (isVercel) {
-    // Production: Use serverless-optimized Chrome
-    console.log('[PDF Generator] Using serverless Chrome (@sparticuz/chromium)')
+    // Production: Use serverless-optimized Chrome with LOW MEMORY MODE
+    console.log('[PDF Generator] Using serverless Chrome with LOW MEMORY MODE for Hobby plan')
     const chromium = await import('@sparticuz/chromium')
     const puppeteerCore = await import('puppeteer-core')
     
     try {
-      // Critical: Get executable path before launch
+      // CRITICAL: Enable low-memory mode for Hobby plan (1024MB limit)
+      chromium.default.setGraphicsMode = false
+      
+      // Get executable path
       const executablePath = await chromium.default.executablePath()
       
-      console.log('[PDF Generator] Chrome will be launched with:')
+      console.log('[PDF Generator] LOW MEMORY configuration:')
+      console.log('  - Graphics Mode:', chromium.default.setGraphicsMode)
       console.log('  - Executable:', executablePath)
-      console.log('  - Args count:', chromium.default.args.length)
+      console.log('  - Memory optimization: ENABLED')
       
       browser = await puppeteerCore.default.launch({
-        args: chromium.default.args,
+        args: [
+          ...chromium.default.args,
+          // Additional low-memory flags for Hobby plan
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-setuid-sandbox',
+          '--no-sandbox',
+          '--no-zygote',
+          '--single-process',
+          '--disable-accelerated-2d-canvas',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-breakpad',
+          '--disable-component-extensions-with-background-pages',
+          '--disable-extensions',
+          '--disable-features=TranslateUI',
+          '--disable-ipc-flooding-protection',
+          '--disable-renderer-backgrounding',
+          '--enable-features=NetworkService,NetworkServiceInProcess',
+          '--force-color-profile=srgb',
+          '--hide-scrollbars',
+          '--metrics-recording-only',
+          '--mute-audio',
+        ],
         defaultViewport: chromium.default.defaultViewport,
         executablePath,
         headless: chromium.default.headless,
         ignoreHTTPSErrors: true,
-        dumpio: true, // Log browser console to help debug
       })
       
-      console.log('[PDF Generator] Chrome launched successfully')
+      console.log('[PDF Generator] Chrome launched successfully in LOW MEMORY MODE')
     } catch (error) {
       console.error('[PDF Generator] Chrome launch failed:', error)
-      console.error('[PDF Generator] Error stack:', error instanceof Error ? error.stack : 'No stack')
-      throw new Error(`Failed to launch browser: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('[PDF Generator] Error details:', error instanceof Error ? error.message : 'Unknown')
+      throw new Error(`Failed to launch browser in low-memory mode: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   } else {
     // Local development: Use standard Puppeteer
