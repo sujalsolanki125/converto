@@ -294,13 +294,20 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
     try {
       // CRITICAL: Enable low-memory mode for Hobby plan (1024MB limit)
       chromium.default.setGraphicsMode = false
+      chromium.default.setHeadlessMode = 'shell'
       
       // Get executable path
       const executablePath = await chromium.default.executablePath()
 
       // Ensure Chromium shared libraries can be located by the loader
       const chromiumDir = path.dirname(executablePath)
-      const libraryPathCandidates = [chromiumDir, path.join(chromiumDir, 'swiftshader')]
+      const libraryPathCandidates = [
+        chromiumDir,
+        '/tmp',
+        '/tmp/chromium',
+        '/tmp/swiftshader',
+        '/tmp/al2',
+      ]
       const currentLibraryPath = process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH.split(':') : []
       const mergedLibraryPaths = [...libraryPathCandidates, ...currentLibraryPath.filter(Boolean)]
       process.env.LD_LIBRARY_PATH = mergedLibraryPaths.join(':')
@@ -308,6 +315,7 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
       console.log('[PDF Generator] LOW MEMORY configuration:')
       console.log('  - Graphics Enabled:', chromium.default.graphics)
       console.log('  - Executable:', executablePath)
+      console.log('  - LD_LIBRARY_PATH:', process.env.LD_LIBRARY_PATH)
       console.log('  - Memory optimization: ENABLED')
       
       browser = await puppeteerCore.default.launch({
