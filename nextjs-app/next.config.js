@@ -5,6 +5,11 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   
+  // CRITICAL: Prevent Next.js from bundling Puppeteer binaries
+  experimental: {
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+  },
+  
   // Optimize images
   images: {
     formats: ['image/avif', 'image/webp'],
