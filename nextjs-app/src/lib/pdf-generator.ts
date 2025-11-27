@@ -297,14 +297,14 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
       chromium.default.setHeadlessMode = 'shell'
       
       // Get executable path
-      const chromiumBundlePath = path.join(process.cwd(), 'node_modules', '@sparticuz', 'chromium')
-      const executablePath = await chromium.default.executablePath(chromiumBundlePath)
+      const chromiumPackagePath = path.join(process.cwd(), 'node_modules', '@sparticuz', 'chromium')
+      const executablePath = await chromium.default.executablePath()
 
       // Ensure Chromium shared libraries can be located by the loader
       const chromiumDir = path.dirname(executablePath)
       const libraryPathCandidates = [
         chromiumDir,
-        path.join(chromiumBundlePath, 'bin'),
+        path.join(chromiumPackagePath, 'bin'),
         '/tmp',
         '/tmp/chromium',
         '/tmp/swiftshader',

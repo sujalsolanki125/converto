@@ -525,7 +525,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-console.log('BibCit application loaded successfully');
+console.log('converto application loaded successfully');
 
 /**
  * Toggle How to Use section
