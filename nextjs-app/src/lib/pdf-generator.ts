@@ -1,3 +1,5 @@
+import path from 'path'
+
 import { convertMarkdown } from './markdown-converter'
 
 interface PdfOptions {
@@ -295,9 +297,16 @@ export async function generatePdf(options: PdfOptions): Promise<Buffer> {
       
       // Get executable path
       const executablePath = await chromium.default.executablePath()
+
+      // Ensure Chromium shared libraries can be located by the loader
+      const chromiumDir = path.dirname(executablePath)
+      const libraryPathCandidates = [chromiumDir, path.join(chromiumDir, 'swiftshader')]
+      const currentLibraryPath = process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH.split(':') : []
+      const mergedLibraryPaths = [...libraryPathCandidates, ...currentLibraryPath.filter(Boolean)]
+      process.env.LD_LIBRARY_PATH = mergedLibraryPaths.join(':')
       
       console.log('[PDF Generator] LOW MEMORY configuration:')
-      console.log('  - Graphics Mode:', chromium.default.setGraphicsMode)
+      console.log('  - Graphics Enabled:', chromium.default.graphics)
       console.log('  - Executable:', executablePath)
       console.log('  - Memory optimization: ENABLED')
       
