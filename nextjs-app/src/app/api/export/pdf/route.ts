@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { content, title = 'Document', author = '', date = new Date().toLocaleDateString(), options = {} } = body
     const theme = options.theme || 'color'
+    const isPreEditedHTML = options.isPreEditedHTML || false
 
     // Validate content
     if (!content || typeof content !== 'string') {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[PDF Export] Generating PDF for document: "${title}" (${content.length} chars)`)
+    console.log(`[PDF Export] Generating PDF for document: "${title}" (${content.length} chars, Pre-edited: ${isPreEditedHTML})`)
 
     // Generate PDF
     const pdfBuffer = await generatePdf({

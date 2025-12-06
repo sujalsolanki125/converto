@@ -257,6 +257,37 @@ function insertAtCursor(text) {
 }
 
 /**
+ * Get content for export - uses edited preview HTML if available, otherwise markdown
+ */
+function getContentForExport() {
+    const preview = document.getElementById('preview');
+    const markdown = document.getElementById('markdownInput').value;
+    
+    // Check if preview has been edited (has actual content and is different from placeholder)
+    const previewHTML = preview.innerHTML;
+    const hasEditedContent = previewHTML && 
+                            !previewHTML.includes('placeholder') && 
+                            !previewHTML.includes('Welcome to Converto') &&
+                            previewHTML.trim().length > 100;
+    
+    if (hasEditedContent && editHistory.length > 1) {
+        // User has edited preview - use the HTML directly
+        console.log('📝 Using edited preview content for export');
+        return {
+            type: 'html',
+            content: previewHTML
+        };
+    } else {
+        // Use original markdown
+        console.log('📝 Using markdown content for export');
+        return {
+            type: 'markdown',
+            content: markdown
+        };
+    }
+}
+
+/**
  * Export to HTML
  */
 async function exportToHTML() {
@@ -265,9 +296,9 @@ async function exportToHTML() {
         return;
     }
     
-    const markdown = document.getElementById('markdownInput').value;
+    const contentData = getContentForExport();
     
-    if (!markdown.trim()) {
+    if (!contentData.content || !contentData.content.trim()) {
         alert('Please enter some content first');
         return;
     }
@@ -286,10 +317,11 @@ async function exportToHTML() {
             title: 'Document',
             author: 'Converto User',
             date: new Date().toLocaleDateString(),
-            theme: theme
+            theme: theme,
+            isPreEditedHTML: contentData.type === 'html'
         };
 
-        const result = await exportHandler.exportToHTML(markdown, options);
+        const result = await exportHandler.exportToHTML(contentData.content, options);
         
         if (result.success) {
             showNotification('HTML exported successfully!', 'success');
@@ -314,9 +346,9 @@ async function exportToDOCX() {
         return;
     }
     
-    const markdown = document.getElementById('markdownInput').value;
+    const contentData = getContentForExport();
     
-    if (!markdown.trim()) {
+    if (!contentData.content || !contentData.content.trim()) {
         alert('Please enter some content first');
         return;
     }
@@ -336,10 +368,11 @@ async function exportToDOCX() {
             date: new Date().toLocaleDateString(),
             includeTOC: document.getElementById('includeTOC').checked,
             pageNumbers: document.getElementById('pageNumbers').checked,
-            theme: theme
+            theme: theme,
+            isPreEditedHTML: contentData.type === 'html'
         };
 
-        const result = await exportHandler.exportToDOCX(markdown, options);
+        const result = await exportHandler.exportToDOCX(contentData.content, options);
         
         if (result.success) {
             showNotification('DOCX exported successfully!', 'success');
@@ -364,9 +397,9 @@ async function exportToPDF() {
         return;
     }
     
-    const markdown = document.getElementById('markdownInput').value;
+    const contentData = getContentForExport();
     
-    if (!markdown.trim()) {
+    if (!contentData.content || !contentData.content.trim()) {
         alert('Please enter some content first');
         return;
     }
@@ -392,10 +425,11 @@ async function exportToPDF() {
             date: new Date().toLocaleDateString(),
             includeTOC: document.getElementById('includeTOC').checked,
             includeStyles: document.getElementById('includeStyles').checked,
-            theme: theme
+            theme: theme,
+            isPreEditedHTML: contentData.type === 'html'
         };
 
-        const result = await exportHandler.exportToPDF(markdown, options, updateStatus);
+        const result = await exportHandler.exportToPDF(contentData.content, options, updateStatus);
         
         if (result.success) {
             btn.innerHTML = '✅ PDF Downloaded!';

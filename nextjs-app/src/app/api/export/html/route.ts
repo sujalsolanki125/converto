@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { content, title = 'Document', options = {} } = body
     const theme = options.theme || 'color'
+    const isPreEditedHTML = options.isPreEditedHTML || false
 
     // Validate content
     if (!content || typeof content !== 'string') {
@@ -24,10 +25,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[HTML Export] Generating HTML for document: "${title}" (${content.length} chars)`)
+    console.log(`[HTML Export] Generating HTML for document: "${title}" (${content.length} chars, Pre-edited: ${isPreEditedHTML})`)
 
-    // Convert markdown to HTML
-    const bodyHTML = convertMarkdown(content)
+    // Convert markdown to HTML or use pre-edited HTML
+    const bodyHTML = isPreEditedHTML ? content : convertMarkdown(content)
 
     // Theme colors - matching original export-handler.js
     const colors = theme === 'color' ? {

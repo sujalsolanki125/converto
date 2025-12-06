@@ -4,9 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 
 interface PreviewProps {
   html: string
+  onPreviewEdit?: (html: string) => void
 }
 
-export default function Preview({ html }: PreviewProps) {
+export default function Preview({ html, onPreviewEdit }: PreviewProps) {
   const [editMode, setEditMode] = useState(false)
   const [stats, setStats] = useState({
     words: 0,
@@ -101,16 +102,31 @@ export default function Preview({ html }: PreviewProps) {
   }
 
   const toggleEditMode = () => {
-    setEditMode(!editMode)
+    const newEditMode = !editMode
+    setEditMode(newEditMode)
+    
     if (previewRef.current) {
-      previewRef.current.contentEditable = (!editMode).toString()
+      previewRef.current.contentEditable = newEditMode.toString()
       
       // Add paste event listener when edit mode is enabled
-      if (!editMode) {
+      if (newEditMode) {
         previewRef.current.addEventListener('paste', handlePasteInPreview)
+        previewRef.current.addEventListener('input', handlePreviewChange)
       } else {
         previewRef.current.removeEventListener('paste', handlePasteInPreview)
+        previewRef.current.removeEventListener('input', handlePreviewChange)
+        // Save edited content when disabling edit mode
+        if (onPreviewEdit && previewRef.current.innerHTML) {
+          onPreviewEdit(previewRef.current.innerHTML)
+        }
       }
+    }
+  }
+
+  const handlePreviewChange = () => {
+    // Update parent with edited content on each change
+    if (onPreviewEdit && previewRef.current) {
+      onPreviewEdit(previewRef.current.innerHTML)
     }
   }
 

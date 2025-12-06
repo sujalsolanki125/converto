@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface ExportButtonsProps {
   markdown: string
   html: string
+  editedPreviewHTML?: string
   includeStyling: boolean
   setIncludeStyling: (value: boolean) => void
   includeToc: boolean
@@ -18,6 +19,7 @@ interface ExportButtonsProps {
 export default function ExportButtons({
   markdown,
   html,
+  editedPreviewHTML,
   includeStyling,
   setIncludeStyling,
   includeToc,
@@ -38,7 +40,11 @@ export default function ExportButtons({
   })
 
   const exportToHTML = async () => {
-    if (!markdown.trim()) {
+    // Use edited preview HTML if available, otherwise use markdown
+    const contentToExport = editedPreviewHTML && editedPreviewHTML.trim() ? editedPreviewHTML : markdown
+    const isHTML = editedPreviewHTML && editedPreviewHTML.trim()
+    
+    if (!contentToExport.trim()) {
       alert('Please enter some content first')
       return
     }
@@ -49,12 +55,13 @@ export default function ExportButtons({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: markdown,
+          content: contentToExport,
           title: 'Document',
           options: {
             includeStyles: includeStyling,
             includeTOC: includeToc,
-            theme: pdfTheme
+            theme: pdfTheme,
+            isPreEditedHTML: isHTML
           }
         })
       })
@@ -76,7 +83,11 @@ export default function ExportButtons({
   }
 
   const exportToDOCX = async () => {
-    if (!markdown.trim()) {
+    // Use edited preview HTML if available, otherwise use markdown
+    const contentToExport = editedPreviewHTML && editedPreviewHTML.trim() ? editedPreviewHTML : markdown
+    const isHTML = editedPreviewHTML && editedPreviewHTML.trim()
+    
+    if (!contentToExport.trim()) {
       alert('Please enter some content first')
       return
     }
@@ -87,7 +98,7 @@ export default function ExportButtons({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: markdown,
+          content: contentToExport,
           title: 'Document',
           author: 'Converto User',
           date: new Date().toLocaleDateString(),
@@ -95,7 +106,8 @@ export default function ExportButtons({
             includeStyles: includeStyling,
             includeTOC: includeToc,
             pageNumbers: includePageNumbers,
-            theme: pdfTheme
+            theme: pdfTheme,
+            isPreEditedHTML: isHTML
           }
         })
       })
@@ -117,7 +129,11 @@ export default function ExportButtons({
   }
 
   const exportToPDF = async () => {
-    if (!markdown.trim()) {
+    // Use edited preview HTML if available, otherwise use markdown
+    const contentToExport = editedPreviewHTML && editedPreviewHTML.trim() ? editedPreviewHTML : markdown
+    const isHTML = editedPreviewHTML && editedPreviewHTML.trim()
+    
+    if (!contentToExport.trim()) {
       alert('Please enter some content first')
       return
     }
@@ -128,7 +144,7 @@ export default function ExportButtons({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: markdown,
+          content: contentToExport,
           title: 'Document',
           author: 'Converto User',
           date: new Date().toLocaleDateString(),
@@ -136,7 +152,8 @@ export default function ExportButtons({
             includeStyles: includeStyling,
             includeTOC: includeToc,
             pageNumbers: includePageNumbers,
-            theme: pdfTheme
+            theme: pdfTheme,
+            isPreEditedHTML: isHTML
           }
         })
       })

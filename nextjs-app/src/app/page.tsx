@@ -9,6 +9,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 export default function Home() {
   const [markdown, setMarkdown] = useState('')
   const [html, setHtml] = useState('')
+  const [editedPreviewHTML, setEditedPreviewHTML] = useState('') // Track edited preview content
   const [includeStyling, setIncludeStyling] = useState(true)
   const [includeToc, setIncludeToc] = useState(false)
   const [includePageNumbers, setIncludePageNumbers] = useState(true)
@@ -36,12 +37,16 @@ export default function Home() {
           setMarkdown={setMarkdown}
           setHtml={setHtml}
         />
-        <Preview html={html} />
+        <Preview 
+          html={html} 
+          onPreviewEdit={setEditedPreviewHTML}
+        />
       </div>
 
       <ExportButtons 
           markdown={markdown}
           html={html}
+          editedPreviewHTML={editedPreviewHTML}
           includeStyling={includeStyling}
           setIncludeStyling={setIncludeStyling}
           includeToc={includeToc}
