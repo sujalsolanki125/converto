@@ -10,6 +10,10 @@ interface DocxOptions {
   theme?: 'color' | 'bw';
 }
 
+// Global tracking for math equation images
+let mathImageCounter = 0;
+const mathImages: Array<{ id: string; svg: string }> = [];
+
 export async function generateDocx(options: DocxOptions): Promise<ArrayBuffer> {
   const {
     content,
@@ -18,6 +22,10 @@ export async function generateDocx(options: DocxOptions): Promise<ArrayBuffer> {
     date = new Date().toLocaleDateString(),
     theme = 'color'
   } = options;
+
+  // Reset image tracking for each document
+  mathImageCounter = 0;
+  mathImages.length = 0;
 
   // Parse HTML content
   const dom = new JSDOM(content);
@@ -30,15 +38,20 @@ export async function generateDocx(options: DocxOptions): Promise<ArrayBuffer> {
   const zip = new JSZip();
 
   // Add required DOCX files
-  zip.file('[Content_Types].xml', getDocxContentTypes());
+  zip.file('[Content_Types].xml', getDocxContentTypes(mathImages.length));
   zip.file('_rels/.rels', getDocxRels());
   zip.file('docProps/app.xml', getDocxAppProps());
   zip.file('docProps/core.xml', getDocxCoreProps(title, author));
-  zip.file('word/_rels/document.xml.rels', getDocxDocumentRels());
+  zip.file('word/_rels/document.xml.rels', getDocxDocumentRels(mathImages.length));
   zip.file('word/document.xml', docXml);
   zip.file('word/styles.xml', getDocxStyles(theme));
   zip.file('word/fontTable.xml', getDocxFontTable());
   zip.file('word/settings.xml', getDocxSettings());
+
+  // Add math equation images
+  mathImages.forEach((img, index) => {
+    zip.file(`word/media/math${index + 1}.svg`, img.svg);
+  });
 
   // Generate DOCX buffer
   // Use STORE (no compression) for better compatibility with Microsoft Word
@@ -122,8 +135,8 @@ function createDocxXml(title: string, author: string, date: string, bodyHTML: st
              }
 
              if (latex) {
-                // FIX 2: Render proper OMML Math wrapped in Paragraph
-                return `<w:p>${convertLatexToOmml(latex, true)}</w:p>`;
+                // Render as embedded SVG image
+                return `<w:p>${convertLatexToImageXml(latex, true)}</w:p>`;
              }
           }
           // For non-math divs, process children and wrap if they have content
@@ -220,8 +233,8 @@ function processChildren(node: any): string {
           }
 
           if (latex) {
-            // Render inline OMML
-            result += convertLatexToOmml(latex, false);
+            // Render as embedded SVG image
+            result += convertLatexToImageXml(latex, false);
           }
         } else {
           // Handle regular spans/divs by recursing
@@ -236,48 +249,92 @@ function processChildren(node: any): string {
 }
 
 /**
- * Convert LaTeX to OMML (Office Math) securely
- * FIX: Wraps all math elements in <m:r> (Runs) to prevent Word crashes
+ * Convert LaTeX to embedded SVG image in DOCX
+ * Renders equation as high-quality SVG and embeds as image
  */
-function convertLatexToOmml(latex: string, isDisplay: boolean): string {
+function convertLatexToImageXml(latex: string, isDisplay: boolean): string {
   try {
-    // 1. Render to MathML using KaTeX
-    const mathml = katex.renderToString(latex, {
+    // 1. Render LaTeX to SVG using KaTeX
+    const svg = katex.renderToString(latex, {
       displayMode: isDisplay,
-      output: 'mathml',
+      output: 'html',
       throwOnError: false,
       strict: false
     });
 
-    // 2. Convert MathML to OMML (Corrected Logic)
-    // Replace standard MathML tags with OMML equivalents
-    let omml = mathml
-      .replace(/<math[^>]*>/g, '<m:oMath>')
-      .replace(/<\/math>/g, '</m:oMath>')
-      // Remove MathML grouping that doesn't map 1:1 to OMML
-      .replace(/<mrow>/g, '') 
-      .replace(/<\/mrow>/g, '')
-      // CRITICAL FIX: Wrap content in Runs (m:r) before converting to Text (m:t)
-      // This prevents "orphan text" inside math nodes which crashes Word
-      .replace(/<mi>(.*?)<\/mi>/g, '<m:r><m:t>$1</m:t></m:r>')
-      .replace(/<mo>(.*?)<\/mo>/g, '<m:r><m:t>$1</m:t></m:r>')
-      .replace(/<mn>(.*?)<\/mn>/g, '<m:r><m:t>$1</m:t></m:r>')
-      // Handle superscripts/subscripts
-      .replace(/<msup>/g, '<m:sSup><m:e>')
-      .replace(/<\/msup>/g, '</m:e></m:sSup>')
-      .replace(/<msub>/g, '<m:sSub><m:e>')
-      .replace(/<\/msub>/g, '</m:e></m:sSub>')
-      // Handle fractions
-      .replace(/<mfrac>/g, '<m:f><m:num>')
-      .replace(/<\/mfrac>/g, '</m:den></m:f>')
-      // Clean up common entities
-      .replace(/&minus;/g, '-')
-      .replace(/&infin;/g, '∞');
+    // Extract SVG from KaTeX HTML output
+    const svgMatch = svg.match(/<svg[^>]*>[\s\S]*<\/svg>/);
+    if (!svgMatch) {
+      throw new Error('Failed to extract SVG from KaTeX output');
+    }
 
-    return omml;
+    const svgContent = svgMatch[0];
+    
+    // Parse SVG to get dimensions
+    const widthMatch = svgContent.match(/width="([^"]+)"/);
+    const heightMatch = svgContent.match(/height="([^"]+)"/);
+    
+    // Convert ex units to EMUs (English Metric Units for Word)
+    // 1ex ≈ 0.5em ≈ 7 points ≈ 9525 EMUs
+    const parseSize = (sizeStr: string): number => {
+      const num = parseFloat(sizeStr);
+      return Math.round(num * 9525); // Convert ex to EMUs
+    };
+    
+    const widthEMU = widthMatch ? parseSize(widthMatch[1]) : 914400; // Default 1 inch
+    const heightEMU = heightMatch ? parseSize(heightMatch[1]) : 914400;
+
+    // Store SVG for embedding
+    mathImageCounter++;
+    const imageId = `mathImg${mathImageCounter}`;
+    mathImages.push({ id: imageId, svg: svgContent });
+
+    // Create Word XML for embedded image
+    // Using inline image (w:r > w:drawing > wp:inline)
+    const imageXml = `
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="${widthEMU}" cy="${heightEMU}"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="${mathImageCounter}" name="Math Equation ${mathImageCounter}"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="${mathImageCounter}" name="Math${mathImageCounter}.svg"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId${mathImageCounter + 4}"/>
+                    <a:stretch>
+                      <a:fillRect/>
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="${widthEMU}" cy="${heightEMU}"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>`;
+
+    return imageXml;
   } catch (e) {
-    // Fallback: If math conversion fails, return as plain text (safe)
-    return `<w:r><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r>`;
+    // Fallback: If rendering fails, return as plain text
+    console.error('Failed to render math equation:', e);
+    return `<w:r><w:t xml:space="preserve">[Equation: ${escapeXml(latex)}]</w:t></w:r>`;
   }
 }
 
@@ -341,11 +398,12 @@ function escapeXml(text: string): string {
 /**
  * Get DOCX content types
  */
-function getDocxContentTypes(): string {
+function getDocxContentTypes(imageCount: number): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
     <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
     <Default Extension="xml" ContentType="application/xml"/>
+    <Default Extension="svg" ContentType="image/svg+xml"/>
     <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
     <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
     <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
@@ -396,15 +454,20 @@ function getDocxAppProps(): string {
 }
 
 /**
- * Get DOCX document relationships
+ * Get DOCX document relationships (including image relationships)
  */
-function getDocxDocumentRels(): string {
+function getDocxDocumentRels(imageCount: number): string {
+  let imageRels = '';
+  for (let i = 1; i <= imageCount; i++) {
+    imageRels += `    <Relationship Id="rId${i + 4}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/math${i}.svg"/>\n`;
+  }
+  
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
     <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
     <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
     <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-</Relationships>`;
+${imageRels}</Relationships>`;
 }
 
 /**
