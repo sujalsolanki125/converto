@@ -639,6 +639,7 @@ function toggleEditMode() {
     const preview = document.getElementById('preview');
     const editToolbar = document.getElementById('editToolbar');
     const editModeBtn = document.getElementById('editModeBtn');
+    const pasteInstructions = document.getElementById('pasteInstructions');
     
     isEditMode = !isEditMode;
     
@@ -648,6 +649,7 @@ function toggleEditMode() {
         preview.style.outline = '2px solid rgba(102, 228, 255, 0.3)';
         preview.style.outlineOffset = '4px';
         editToolbar.classList.remove('hidden');
+        if (pasteInstructions) pasteInstructions.classList.remove('hidden');
         editModeBtn.innerHTML = '🔒 Disable Editing';
         editModeBtn.classList.add('btn-danger');
         
@@ -661,6 +663,7 @@ function toggleEditMode() {
         preview.contentEditable = false;
         preview.style.outline = 'none';
         editToolbar.classList.add('hidden');
+        if (pasteInstructions) pasteInstructions.classList.add('hidden');
         editModeBtn.innerHTML = '✏️ Enable Editing';
         editModeBtn.classList.remove('btn-danger');
         
@@ -880,13 +883,23 @@ function handlePasteImage(event) {
 }
 
 /**
- * Handle paste event for images in preview (edit mode)
+ * Handle paste event for images and rich content in preview (edit mode)
  */
 function handlePasteInPreview(event) {
     if (!isEditMode) return;
     
-    const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+    const clipboardData = event.clipboardData || event.originalEvent.clipboardData;
+    const items = clipboardData.items;
     
+    // First check for HTML content (formatted text, equations, etc.)
+    const htmlData = clipboardData.getData('text/html');
+    if (htmlData && htmlData.trim()) {
+        event.preventDefault();
+        insertRichContentToPreview(htmlData);
+        return;
+    }
+    
+    // Check for images
     for (let item of items) {
         if (item.type.startsWith('image/')) {
             event.preventDefault();
@@ -894,8 +907,160 @@ function handlePasteInPreview(event) {
             if (file) {
                 insertImageDirectlyToPreview(file);
             }
+            return;
         }
     }
+    
+    // If plain text, allow default paste behavior
+    // The contentEditable will handle it automatically
+}
+
+/**
+ * Insert rich formatted content (HTML) into preview preserving all styles
+ */
+function insertRichContentToPreview(htmlContent) {
+    try {
+        // Create a temporary container to parse the HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        
+        // Process and clean the content while preserving important formatting
+        const processedContent = processRichContent(tempDiv);
+        
+        // Insert at cursor position
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            
+            // Insert each processed node
+            processedContent.childNodes.forEach(node => {
+                const clonedNode = node.cloneNode(true);
+                range.insertNode(clonedNode);
+                range.setStartAfter(clonedNode);
+            });
+            
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            // If no selection, append to preview
+            const preview = document.getElementById('preview');
+            processedContent.childNodes.forEach(node => {
+                preview.appendChild(node.cloneNode(true));
+            });
+        }
+        
+        // Re-render math equations if any
+        if (typeof renderMathInElement !== 'undefined') {
+            const preview = document.getElementById('preview');
+            renderMathInElement(preview, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+        
+        // Re-apply syntax highlighting if code blocks exist
+        const preview = document.getElementById('preview');
+        preview.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+        
+        saveHistory();
+        showNotification('Content pasted successfully with formatting preserved!', 'success');
+        
+    } catch (error) {
+        console.error('Error pasting rich content:', error);
+        showNotification('Error pasting content. Try pasting as plain text.', 'error');
+    }
+}
+
+/**
+ * Process rich content to preserve important formatting while removing unwanted styles
+ */
+function processRichContent(container) {
+    const processed = document.createElement('div');
+    
+    // Walk through all nodes and preserve important ones
+    const walkNodes = (node, parent) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            // Keep text nodes
+            parent.appendChild(node.cloneNode(true));
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase();
+            
+            // List of tags to preserve
+            const preserveTags = [
+                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                'p', 'div', 'span',
+                'strong', 'b', 'em', 'i', 'u', 's', 'mark',
+                'ul', 'ol', 'li',
+                'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                'pre', 'code',
+                'blockquote',
+                'a', 'img',
+                'br', 'hr'
+            ];
+            
+            if (preserveTags.includes(tagName)) {
+                const newElement = document.createElement(tagName);
+                
+                // Preserve specific attributes
+                if (tagName === 'a' && node.hasAttribute('href')) {
+                    newElement.setAttribute('href', node.getAttribute('href'));
+                }
+                if (tagName === 'img' && node.hasAttribute('src')) {
+                    newElement.setAttribute('src', node.getAttribute('src'));
+                    newElement.style.maxWidth = '100%';
+                    newElement.style.height = 'auto';
+                }
+                if (tagName === 'code' && node.hasAttribute('class')) {
+                    // Preserve language class for syntax highlighting
+                    const classAttr = node.getAttribute('class');
+                    if (classAttr.includes('language-') || classAttr.includes('hljs')) {
+                        newElement.setAttribute('class', classAttr);
+                    }
+                }
+                
+                // Preserve inline styles for highlights and special formatting
+                if (node.hasAttribute('style')) {
+                    const style = node.getAttribute('style');
+                    // Keep background colors (for highlights)
+                    if (style.includes('background')) {
+                        newElement.setAttribute('style', style);
+                    }
+                }
+                
+                // Preserve classes for highlights
+                if (node.hasAttribute('class')) {
+                    const classAttr = node.getAttribute('class');
+                    if (classAttr.includes('highlight-') || classAttr.includes('katex')) {
+                        newElement.setAttribute('class', classAttr);
+                    }
+                }
+                
+                // Special handling for KaTeX math
+                if (node.classList && (node.classList.contains('katex') || node.classList.contains('katex-display') || node.classList.contains('katex-html'))) {
+                    // Keep entire KaTeX structure
+                    parent.appendChild(node.cloneNode(true));
+                    return;
+                }
+                
+                // Recursively process children
+                node.childNodes.forEach(child => walkNodes(child, newElement));
+                parent.appendChild(newElement);
+            } else {
+                // For other tags, just process children
+                node.childNodes.forEach(child => walkNodes(child, parent));
+            }
+        }
+    };
+    
+    container.childNodes.forEach(child => walkNodes(child, processed));
+    return processed;
 }
 
 /**

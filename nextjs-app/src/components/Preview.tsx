@@ -104,7 +104,204 @@ export default function Preview({ html }: PreviewProps) {
     setEditMode(!editMode)
     if (previewRef.current) {
       previewRef.current.contentEditable = (!editMode).toString()
+      
+      // Add paste event listener when edit mode is enabled
+      if (!editMode) {
+        previewRef.current.addEventListener('paste', handlePasteInPreview)
+      } else {
+        previewRef.current.removeEventListener('paste', handlePasteInPreview)
+      }
     }
+  }
+
+  const handlePasteInPreview = (event: ClipboardEvent) => {
+    const clipboardData = event.clipboardData
+    if (!clipboardData) return
+
+    // First check for HTML content (formatted text, equations, etc.)
+    const htmlData = clipboardData.getData('text/html')
+    if (htmlData && htmlData.trim()) {
+      event.preventDefault()
+      insertRichContentToPreview(htmlData)
+      return
+    }
+
+    // Check for images
+    const items = clipboardData.items
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        event.preventDefault()
+        const file = items[i].getAsFile()
+        if (file) {
+          insertImageToPreview(file)
+        }
+        return
+      }
+    }
+
+    // If plain text, allow default paste behavior
+  }
+
+  const insertRichContentToPreview = (htmlContent: string) => {
+    try {
+      // Create a temporary container to parse the HTML
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = htmlContent
+
+      // Process and clean the content while preserving important formatting
+      const processedContent = processRichContent(tempDiv)
+
+      // Insert at cursor position
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        range.deleteContents()
+
+        // Insert each processed node
+        Array.from(processedContent.childNodes).forEach(node => {
+          const clonedNode = node.cloneNode(true)
+          range.insertNode(clonedNode)
+          range.setStartAfter(clonedNode)
+        })
+
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+      } else if (previewRef.current) {
+        // If no selection, append to preview
+        Array.from(processedContent.childNodes).forEach(node => {
+          previewRef.current?.appendChild(node.cloneNode(true))
+        })
+      }
+
+      // Re-render math equations if any
+      if (typeof window !== 'undefined' && (window as any).renderMathInElement && previewRef.current) {
+        (window as any).renderMathInElement(previewRef.current, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        })
+      }
+
+      // Re-apply syntax highlighting if code blocks exist
+      if (typeof window !== 'undefined' && (window as any).hljs && previewRef.current) {
+        previewRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
+          (window as any).hljs.highlightElement(block)
+        })
+      }
+
+      console.log('✓ Content pasted successfully with formatting preserved!')
+    } catch (error) {
+      console.error('Error pasting rich content:', error)
+    }
+  }
+
+  const processRichContent = (container: HTMLElement): HTMLElement => {
+    const processed = document.createElement('div')
+
+    const walkNodes = (node: Node, parent: HTMLElement) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        parent.appendChild(node.cloneNode(true))
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as HTMLElement
+        const tagName = element.tagName.toLowerCase()
+
+        // List of tags to preserve
+        const preserveTags = [
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'p', 'div', 'span',
+          'strong', 'b', 'em', 'i', 'u', 's', 'mark',
+          'ul', 'ol', 'li',
+          'table', 'thead', 'tbody', 'tr', 'th', 'td',
+          'pre', 'code',
+          'blockquote',
+          'a', 'img',
+          'br', 'hr'
+        ]
+
+        if (preserveTags.includes(tagName)) {
+          const newElement = document.createElement(tagName)
+
+          // Preserve specific attributes
+          if (tagName === 'a' && element.hasAttribute('href')) {
+            newElement.setAttribute('href', element.getAttribute('href') || '')
+          }
+          if (tagName === 'img' && element.hasAttribute('src')) {
+            newElement.setAttribute('src', element.getAttribute('src') || '')
+            newElement.style.maxWidth = '100%'
+            newElement.style.height = 'auto'
+          }
+          if (tagName === 'code' && element.hasAttribute('class')) {
+            const classAttr = element.getAttribute('class')
+            if (classAttr && (classAttr.includes('language-') || classAttr.includes('hljs'))) {
+              newElement.setAttribute('class', classAttr)
+            }
+          }
+
+          // Preserve inline styles for highlights and special formatting
+          if (element.hasAttribute('style')) {
+            const style = element.getAttribute('style')
+            if (style && style.includes('background')) {
+              newElement.setAttribute('style', style)
+            }
+          }
+
+          // Preserve classes for highlights and KaTeX
+          if (element.hasAttribute('class')) {
+            const classAttr = element.getAttribute('class')
+            if (classAttr && (classAttr.includes('highlight-') || classAttr.includes('katex'))) {
+              newElement.setAttribute('class', classAttr)
+            }
+          }
+
+          // Special handling for KaTeX math
+          if (element.classList && (element.classList.contains('katex') || element.classList.contains('katex-display') || element.classList.contains('katex-html'))) {
+            parent.appendChild(element.cloneNode(true))
+            return
+          }
+
+          // Recursively process children
+          Array.from(element.childNodes).forEach(child => walkNodes(child, newElement))
+          parent.appendChild(newElement)
+        } else {
+          // For other tags, just process children
+          Array.from(element.childNodes).forEach(child => walkNodes(child, parent))
+        }
+      }
+    }
+
+    Array.from(container.childNodes).forEach(child => walkNodes(child, processed))
+    return processed
+  }
+
+  const insertImageToPreview = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const base64Data = e.target?.result as string
+      const imgElement = document.createElement('img')
+      imgElement.src = base64Data
+      imgElement.style.maxWidth = '100%'
+      imgElement.style.height = 'auto'
+      imgElement.style.margin = '10px 0'
+      imgElement.style.borderRadius = '8px'
+      imgElement.style.border = '1px solid rgba(102, 228, 255, 0.2)'
+
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        range.deleteContents()
+        range.insertNode(imgElement)
+        range.setStartAfter(imgElement)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+      } else if (previewRef.current) {
+        previewRef.current.appendChild(imgElement)
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   const refreshPreview = () => {
@@ -174,6 +371,21 @@ export default function Preview({ html }: PreviewProps) {
       </div>
       
       {/* Editing Toolbar */}
+      {/* Paste Instructions */}
+      {editMode && (
+        <div className="paste-instructions" style={{ marginBottom: '12px', animation: 'slideDown 0.3s ease' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(102, 228, 255, 0.1)', borderLeft: '3px solid #66e4ff', borderRadius: '4px' }}>
+            <span style={{ fontSize: '24px' }}>📋</span>
+            <div>
+              <strong style={{ color: '#66e4ff' }}>Direct Paste Mode Active!</strong>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255, 255, 255, 0.8)' }}>
+                Copy formatted content (with equations, highlights, tables) from anywhere and paste directly here. All styling will be preserved!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div id="editToolbar" className={`edit-toolbar ${editMode ? '' : 'hidden'}`}>
         <div className="edit-toolbar-group">
           <button onClick={() => formatText('bold')} className="btn btn-tool" title="Bold">
